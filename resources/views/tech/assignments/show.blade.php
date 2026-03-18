@@ -12,14 +12,21 @@
             @can('tech.assets.assign')
                 @if($assignment->status === 'activa')
                     {{-- Solo Acta TI — módulo Tecnología --}}
-                    <form method="POST" action="{{ route('actas.generate', $assignment) }}" class="d-inline">
-                        @csrf
-                        <input type="hidden" name="category" value="TI">
-                        <button type="submit" class="btn btn-sm mr-1"
-                                style="background:#0f766e;color:#fff;border:none;">
-                            <i class="fas fa-file-signature mr-1"></i> Generar Acta TI
-                        </button>
-                    </form>
+                    @if(!empty($actaTi))
+                        <a href="{{ route('actas.show', $actaTi) }}" class="btn btn-sm mr-1"
+                           style="background:#0f766e;color:#fff;border:none;">
+                            <i class="fas fa-file-signature mr-1"></i> Ver Acta TI
+                        </a>
+                    @else
+                        <form method="POST" action="{{ route('actas.generate', $assignment) }}" class="d-inline">
+                            @csrf
+                            <input type="hidden" name="category" value="TI">
+                            <button type="submit" class="btn btn-sm mr-1"
+                                    style="background:#0f766e;color:#fff;border:none;">
+                                <i class="fas fa-file-signature mr-1"></i> Generar Acta TI
+                            </button>
+                        </form>
+                    @endif
                     <a href="{{ route('tech.assignments.return', $assignment) }}" class="btn btn-warning mr-1">
                         <i class="fas fa-undo mr-1"></i> Registrar Devolución
                     </a>

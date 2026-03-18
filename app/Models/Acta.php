@@ -5,6 +5,11 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Models\ActaSignature;
+use App\Models\ActaExcelTemplate;
+use App\Models\ActaFieldValue;
+use App\Models\Assignment;
+use App\Models\User;
 
 class Acta extends Model
 {
@@ -12,8 +17,11 @@ class Acta extends Model
         'assignment_id',
         'acta_number',
         'acta_type',
+        'asset_category',
         'status',
         'pdf_path',
+        'xlsx_draft_path',
+        'xlsx_final_path',
         'generated_by',
         'notes',
         'sent_at',
@@ -48,6 +56,11 @@ class Acta extends Model
     public function signatures(): HasMany
     {
         return $this->hasMany(ActaSignature::class);
+    }
+
+    public function fieldValues(): HasMany
+    {
+        return $this->hasMany(ActaFieldValue::class);
     }
 
     public function collaboratorSignature()
@@ -167,6 +180,107 @@ class Acta extends Model
                          ->count();
         $seq = str_pad($count + 1, 4, '0', STR_PAD_LEFT);
         return "ACT-{$catPrefix}-{$prefix}-{$year}-{$seq}";
+    }
+
+    /**
+     * Genera (o reutiliza) un Acta de ENTREGA para una asignación y categoría (TI/OTRO).
+     *
+     * - No genera si la asignación no tiene activos de esa categoría (no devueltos).
+     * - No duplica: si ya existe un acta activa (no anulada) para assignment+category, la retorna.
+     * - Mantiene la lógica de firmas: collaborator + responsible.
+     * - Si la asignación es a un área (sin colaborador), la firma "collaborator" representa al área.
+     */
+    public static function generateDeliveryForAssignment(Assignment $assignment, string $category, User $responsibleUser): ?self
+    {
+        $category = strtoupper($category);
+        if (!in_array($category, ['TI', 'OTRO'], true)) {
+            $category = 'TI';
+        }
+
+        // Verificar que la asignación tiene activos de esa categoría (aún no devueltos)
+        $hasAssets = $assignment->assignmentAssets()
+            ->whereNull('returned_at')
+            ->whereHas('asset.type', fn($q) => $q->where('category', $category))
+            ->exists();
+
+        if (!$hasAssets) {
+            return null;
+        }
+
+        // No duplicar: si ya existe un acta activa para esta asignación+categoría, reutilizarla
+        $existing = $assignment->actas()
+            ->where('asset_category', $category)
+            ->whereNotIn('status', [self::STATUS_ANULADA])
+            ->latest()
+            ->first();
+
+        if ($existing) {
+            return $existing;
+        }
+
+        $acta = self::create([
+            'assignment_id'  => $assignment->id,
+            'acta_number'    => self::generateActaNumber($category, self::TYPE_ENTREGA),
+            'acta_type'      => self::TYPE_ENTREGA,
+            'asset_category' => $category,
+            'status'         => self::STATUS_BORRADOR,
+            'generated_by'   => $responsibleUser->id,
+        ]);
+
+        $assignment->loadMissing(['collaborator', 'area']);
+
+        // Firma del "receptor": colaborador o área
+        $recipientName  = $assignment->collaborator?->full_name
+            ?? ($assignment->area ? ('Área: ' . $assignment->area->name) : '—');
+        $recipientEmail = $assignment->collaborator?->email; // puede ser null si es área
+
+        ActaSignature::create([
+            'acta_id'          => $acta->id,
+            'signer_role'      => 'collaborator',
+            'signer_name'      => $recipientName,
+            'signer_email'     => $recipientEmail,
+            'token'            => ActaSignature::generateToken(),
+            'token_expires_at' => now()->addDays(7),
+        ]);
+
+        // Firma del responsable (usuario autenticado que genera)
+        ActaSignature::create([
+            'acta_id'          => $acta->id,
+            'signer_role'      => 'responsible',
+            'signer_name'      => $responsibleUser->name,
+            'signer_email'     => $responsibleUser->email,
+            'signer_user_id'   => $responsibleUser->id,
+            'token'            => ActaSignature::generateToken(),
+            'token_expires_at' => now()->addDays(7),
+        ]);
+
+        return $acta;
+    }
+
+    /**
+     * Obtiene la plantilla Excel activa para esta acta (por tipo + categoría).
+     * Fallback: plantilla con asset_category = 'ALL' para el mismo acta_type.
+     */
+    public function activeExcelTemplate(): ?ActaExcelTemplate
+    {
+        $type = $this->acta_type ?? self::TYPE_ENTREGA;
+        $cat  = strtoupper($this->asset_category ?? 'TI');
+
+        $template = ActaExcelTemplate::where('active', true)
+            ->where('acta_type', $type)
+            ->where('asset_category', $cat)
+            ->latest()
+            ->first();
+
+        if ($template) {
+            return $template;
+        }
+
+        return ActaExcelTemplate::where('active', true)
+            ->where('acta_type', $type)
+            ->where('asset_category', 'ALL')
+            ->latest()
+            ->first();
     }
 
     /**

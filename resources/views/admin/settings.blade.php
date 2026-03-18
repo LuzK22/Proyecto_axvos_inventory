@@ -134,10 +134,19 @@
                     <i class="fas fa-file-signature mr-2" style="color:#28a745;"></i> Plantillas de Actas
                 </h3>
                 <div class="card-tools">
-                    <small class="text-muted">Se usan en los documentos PDF de entrega, devolución y préstamo</small>
+                    <small class="text-muted">Configura textos y la plantilla Excel para actas</small>
                 </div>
             </div>
             <div class="card-body">
+                <div class="alert alert-light border d-flex justify-content-between align-items-center">
+                    <div>
+                        <strong>Plantilla Excel (.xlsx)</strong>
+                        <div class="text-muted small">Sube/activa la plantilla y mapea campos a celdas.</div>
+                    </div>
+                    <a href="{{ route('admin.acta-templates.index') }}" class="btn btn-sm btn-success">
+                        <i class="fas fa-file-excel mr-1"></i> Administrar plantillas
+                    </a>
+                </div>
                 <div class="form-group">
                     <label class="font-weight-bold">
                         <i class="fas fa-arrow-up mr-1 text-success"></i> Encabezado del Acta

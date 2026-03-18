@@ -105,8 +105,8 @@
                         @forelse($acta->assignment->activeAssets as $i => $aa)
                         <tr>
                             <td class="text-muted">{{ $i + 1 }}</td>
-                            <td><code>{{ $aa->asset->asset_code ?? '—' }}</code></td>
-                            <td>{{ $aa->asset->assetType->name ?? '—' }}</td>
+                            <td><code>{{ $aa->asset->internal_code ?? '—' }}</code></td>
+                            <td>{{ $aa->asset->type?->name ?? '—' }}</td>
                             <td>{{ trim(($aa->asset->brand ?? '') . ' ' . ($aa->asset->model ?? '')) ?: '—' }}</td>
                             <td class="text-muted small">{{ $aa->asset->serial ?? '—' }}</td>
                         </tr>
@@ -124,6 +124,53 @@
 
     {{-- ── Columna lateral: firmas ──────────────────────────── --}}
     <div class="col-lg-4">
+
+        {{-- Excel (plantilla configurable) --}}
+        <div class="card shadow-sm mb-3" style="border-top:3px solid #16a34a;">
+            <div class="card-body">
+                <p class="font-weight-bold mb-2" style="font-size:.85rem;">
+                    <i class="fas fa-file-excel mr-1" style="color:#16a34a;"></i> Excel del Acta
+                </p>
+
+                <form method="POST" action="{{ route('actas.excel.draft.generate', $acta) }}" class="mb-2">
+                    @csrf
+                    <button class="btn btn-sm btn-success btn-block">
+                        <i class="fas fa-magic mr-1"></i> Generar Excel borrador
+                    </button>
+                </form>
+
+                @if($acta->xlsx_draft_path)
+                    <a href="{{ route('actas.excel.draft.download', $acta) }}" class="btn btn-sm btn-outline-success btn-block mb-2">
+                        <i class="fas fa-download mr-1"></i> Descargar borrador
+                    </a>
+                @endif
+
+                <form method="POST" action="{{ route('actas.excel.final.upload', $acta) }}" enctype="multipart/form-data">
+                    @csrf
+                    <div class="custom-file mb-2">
+                        <input type="file" class="custom-file-input" id="excel_final" name="excel_final" accept=".xlsx" required>
+                        <label class="custom-file-label" for="excel_final">Subir Excel final...</label>
+                    </div>
+                    <button class="btn btn-sm btn-outline-primary btn-block">
+                        <i class="fas fa-upload mr-1"></i> Guardar Excel final
+                    </button>
+                </form>
+
+                @if($acta->xlsx_final_path)
+                    <a href="{{ route('actas.excel.final.download', $acta) }}" class="btn btn-sm btn-outline-primary btn-block mt-2">
+                        <i class="fas fa-download mr-1"></i> Descargar Excel final
+                    </a>
+                @endif
+
+                <hr class="my-2">
+                <form method="POST" action="{{ route('actas.pdf.final.generate', $acta) }}">
+                    @csrf
+                    <button class="btn btn-sm btn-danger btn-block">
+                        <i class="fas fa-file-pdf mr-1"></i> Generar PDF final (desde Excel)
+                    </button>
+                </form>
+            </div>
+        </div>
 
         {{-- Acciones --}}
         @if(in_array($acta->status, [\App\Models\Acta::STATUS_BORRADOR, \App\Models\Acta::STATUS_FIRMADA_COLABORADOR, \App\Models\Acta::STATUS_FIRMADA_RESPONSABLE]))
@@ -156,8 +203,20 @@
                         @endif
                     @endforeach
 
+                    <div class="mb-2">
+                        <label class="text-muted mb-1 d-block" style="font-size:.75rem;">
+                            <i class="fas fa-user-plus mr-1"></i>
+                            Tercer correo (opcional)
+                        </label>
+                        <input type="email"
+                               name="third_email"
+                               class="form-control form-control-sm"
+                               value="{{ old('third_email') }}"
+                               placeholder="tercero@ejemplo.com">
+                    </div>
+
                     <button class="btn btn-primary btn-sm btn-block mt-2">
-                        <i class="fas fa-paper-plane mr-1"></i> Enviar correos de firma
+                        <i class="fas fa-paper-plane mr-1"></i> Enviar acta (PDF adjunto)
                     </button>
                 </form>
             </div>

@@ -19,6 +19,8 @@ use App\Http\Controllers\DeletionRequestController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\OtroAssetAssignmentController;
 use App\Http\Controllers\AreaController;
+use App\Http\Controllers\ActaExcelTemplateController;
+use App\Http\Controllers\ActaExcelTemplateFieldController;
 
 /*
 |--------------------------------------------------------------------------
@@ -326,6 +328,12 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/{acta}',                     [ActaController::class, 'show'])        ->name('show');
         Route::get('/{acta}/pdf',                 [ActaController::class, 'downloadPdf']) ->name('pdf');
         Route::get('/{acta}/preview',             [ActaController::class, 'previewPdf'])  ->name('preview');
+        // Excel (plantilla configurable)
+        Route::post('/{acta}/excel/draft',        [ActaController::class, 'generateExcelDraft'])->name('excel.draft.generate');
+        Route::get('/{acta}/excel/draft',         [ActaController::class, 'downloadExcelDraft'])->name('excel.draft.download');
+        Route::post('/{acta}/excel/final',        [ActaController::class, 'uploadExcelFinal'])->name('excel.final.upload');
+        Route::get('/{acta}/excel/final',         [ActaController::class, 'downloadExcelFinal'])->name('excel.final.download');
+        Route::post('/{acta}/pdf/final',          [ActaController::class, 'generatePdfFinal'])->name('pdf.final.generate');
         Route::post('/{acta}/send',               [ActaController::class, 'send'])        ->name('send');
         Route::post('/{acta}/sign',               [ActaController::class, 'signInternal'])->name('sign.internal');
         Route::patch('/{acta}/void',              [ActaController::class, 'void'])        ->name('void');
@@ -417,6 +425,30 @@ Route::middleware(['auth'])->group(function () {
 
         Route::patch('/assignment-templates/{assignmentTemplate}/toggle', [AssignmentTemplateController::class, 'toggleActive'])
             ->name('assignment-templates.toggle');
+
+        // Plantillas Excel de Actas (configurable por instalación)
+        Route::get('/acta-templates', [ActaExcelTemplateController::class, 'index'])
+            ->name('acta-templates.index');
+        Route::get('/acta-templates/create', [ActaExcelTemplateController::class, 'create'])
+            ->name('acta-templates.create');
+        Route::post('/acta-templates', [ActaExcelTemplateController::class, 'store'])
+            ->name('acta-templates.store');
+        Route::get('/acta-templates/{actaExcelTemplate}/edit', [ActaExcelTemplateController::class, 'edit'])
+            ->name('acta-templates.edit');
+        Route::put('/acta-templates/{actaExcelTemplate}', [ActaExcelTemplateController::class, 'update'])
+            ->name('acta-templates.update');
+        Route::patch('/acta-templates/{actaExcelTemplate}/toggle', [ActaExcelTemplateController::class, 'toggleActive'])
+            ->name('acta-templates.toggle');
+
+        // Mapeo de campos → celdas para una plantilla
+        Route::get('/acta-templates/{actaExcelTemplate}/fields', [ActaExcelTemplateFieldController::class, 'index'])
+            ->name('acta-templates.fields.index');
+        Route::post('/acta-templates/{actaExcelTemplate}/fields', [ActaExcelTemplateFieldController::class, 'store'])
+            ->name('acta-templates.fields.store');
+        Route::put('/acta-templates/{actaExcelTemplate}/fields/{field}', [ActaExcelTemplateFieldController::class, 'update'])
+            ->name('acta-templates.fields.update');
+        Route::delete('/acta-templates/{actaExcelTemplate}/fields/{field}', [ActaExcelTemplateFieldController::class, 'destroy'])
+            ->name('acta-templates.fields.destroy');
     });
 
     // API — plantilla por valor (para el modal de asignación)

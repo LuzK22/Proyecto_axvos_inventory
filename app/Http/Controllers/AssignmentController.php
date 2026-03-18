@@ -103,6 +103,9 @@ class AssignmentController extends Controller
 
                 $asset->update(['status_id' => $assignedStatus->id]);
             }
+
+            // Generar acta de ENTREGA automática para TI (si aplica y sin duplicar)
+            Acta::generateDeliveryForAssignment($assignment, 'TI', auth()->user());
         });
 
         return redirect()
@@ -124,7 +127,13 @@ class AssignmentController extends Controller
             'assignedBy',
         ]);
 
-        return view('tech.assignments.show', compact('assignment'));
+        $actaTi = $assignment->actas()
+            ->where('asset_category', 'TI')
+            ->whereNotIn('status', [Acta::STATUS_ANULADA])
+            ->latest()
+            ->first();
+
+        return view('tech.assignments.show', compact('assignment', 'actaTi'));
     }
 
     /* =========================================================

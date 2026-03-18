@@ -3,13 +3,17 @@
 namespace App\Http\Controllers;
 
 use App\Mail\ActaSigningRequest;
+use App\Mail\ActaPdfFinalMail;
 use App\Models\Acta;
 use App\Models\ActaSignature;
+use App\Models\ActaExcelTemplateField;
 use App\Models\Assignment;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
+use PhpOffice\PhpSpreadsheet\IOFactory;
+use Symfony\Component\Process\Process;
 
 class ActaController extends Controller
 {
@@ -49,12 +53,155 @@ class ActaController extends Controller
     {
         $acta->load([
             'assignment.collaborator',
-            'assignment.activeAssets.asset.assetType',
+            'assignment.activeAssets.asset.type',
             'generatedBy',
             'signatures.signerUser',
         ]);
 
         return view('documents.actas.show', compact('acta'));
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | EXCEL (plantilla configurable)
+    |--------------------------------------------------------------------------
+    */
+
+    public function generateExcelDraft(Request $request, Acta $acta)
+    {
+        $acta->load([
+            'assignment.collaborator',
+            'assignment.area',
+            'assignment.assignmentAssets.asset.type',
+            'generatedBy',
+            'fieldValues',
+        ]);
+
+        $template = $acta->activeExcelTemplate();
+        if (!$template) {
+            return back()->with('error', 'No hay una plantilla Excel activa para este tipo/categoría de acta.');
+        }
+
+        $template->load('fields');
+
+        $spreadsheet = IOFactory::load(storage_path('app/' . $template->file_path));
+        $sheet = $spreadsheet->getActiveSheet();
+
+        $category = strtoupper($acta->asset_category ?? 'TI');
+
+        // Activos incluidos: solo categoría correspondiente y no devueltos
+        $assets = $acta->assignment->assignmentAssets
+            ->whereNull('returned_at')
+            ->filter(fn($aa) => strtoupper($aa->asset?->type?->category ?? '') === $category)
+            ->values();
+
+        if ($assets->isEmpty()) {
+            return back()->with('error', 'Esta acta no tiene activos de la categoría correspondiente.');
+        }
+
+        // Mapa de valores base (no iterables)
+        $recipientName = $acta->assignment->collaborator?->full_name
+            ?? ($acta->assignment->area ? ('Área: ' . $acta->assignment->area->name) : '—');
+
+        $base = [
+            'acta_number'          => $acta->acta_number,
+            'acta_type'            => $acta->acta_type,
+            'asset_category'       => $category,
+            'collaborator_name'    => $acta->assignment->collaborator?->full_name,
+            'collaborator_document'=> $acta->assignment->collaborator?->document,
+            'collaborator_email'   => $acta->assignment->collaborator?->email,
+            'area_name'            => $acta->assignment->area?->name,
+            'recipient_name'       => $recipientName,
+            'assignment_date'      => optional($acta->assignment->assignment_date)->format('d/m/Y'),
+            'delivery_date'        => now()->format('d/m/Y'),
+            'responsible_name'     => $acta->generatedBy?->name,
+            'responsible_email'    => $acta->generatedBy?->email,
+        ];
+
+        // Valores manuales/dinámicos guardados por acta
+        $manual = $acta->fieldValues->pluck('value', 'field_key')->toArray();
+
+        $startRow = $template->assets_start_row ?? 1;
+
+        foreach ($template->fields as $field) {
+            $key = $field->field_key;
+
+            if ($field->is_iterable) {
+                // Ej: A{row}, B{row}
+                foreach ($assets as $idx => $aa) {
+                    $row = $startRow + $idx;
+                    $cell = str_replace('{row}', (string) $row, $field->cell_ref);
+                    $sheet->setCellValue($cell, $this->resolveIterableValue($key, $aa));
+                }
+            } else {
+                $value = $manual[$key] ?? $base[$key] ?? '';
+                $sheet->setCellValue($field->cell_ref, $value);
+            }
+        }
+
+        $filename = $acta->acta_number . '-draft.xlsx';
+        $path = 'actas/excel-drafts/' . $filename;
+
+        Storage::makeDirectory('actas/excel-drafts');
+        $tmp = tempnam(sys_get_temp_dir(), 'acta_xlsx_');
+        $writer = IOFactory::createWriter($spreadsheet, 'Xlsx');
+        $writer->save($tmp);
+        Storage::put($path, file_get_contents($tmp));
+        @unlink($tmp);
+
+        $acta->update(['xlsx_draft_path' => $path]);
+
+        return redirect()
+            ->route('actas.show', $acta)
+            ->with('success', 'Excel borrador generado correctamente.');
+    }
+
+    public function downloadExcelDraft(Acta $acta)
+    {
+        if (!$acta->xlsx_draft_path || !Storage::exists($acta->xlsx_draft_path)) {
+            return back()->with('error', 'No hay Excel borrador generado para esta acta.');
+        }
+
+        return response()->download(storage_path('app/' . $acta->xlsx_draft_path), basename($acta->xlsx_draft_path));
+    }
+
+    public function uploadExcelFinal(Request $request, Acta $acta)
+    {
+        $request->validate([
+            'excel_final' => 'required|file|mimes:xlsx|max:10240',
+        ]);
+
+        $filename = $acta->acta_number . '-final.xlsx';
+        $path = $request->file('excel_final')->storeAs('actas/excel-final', $filename);
+
+        $acta->update(['xlsx_final_path' => $path]);
+
+        return redirect()
+            ->route('actas.show', $acta)
+            ->with('success', 'Excel final subido correctamente.');
+    }
+
+    public function downloadExcelFinal(Acta $acta)
+    {
+        if (!$acta->xlsx_final_path || !Storage::exists($acta->xlsx_final_path)) {
+            return back()->with('error', 'No hay Excel final subido para esta acta.');
+        }
+
+        return response()->download(storage_path('app/' . $acta->xlsx_final_path), basename($acta->xlsx_final_path));
+    }
+
+    private function resolveIterableValue(string $key, $assignmentAsset): string
+    {
+        $asset = $assignmentAsset->asset;
+        return match ($key) {
+            'asset_internal_code', 'asset_code' => (string) ($asset?->internal_code ?? ''),
+            'asset_type' => (string) ($asset?->type?->name ?? ''),
+            'asset_brand' => (string) ($asset?->brand ?? ''),
+            'asset_model' => (string) ($asset?->model ?? ''),
+            'asset_serial' => (string) ($asset?->serial ?? ''),
+            'asset_tag' => (string) ($asset?->asset_tag ?? ''),
+            default => '',
+        };
     }
 
     /*
@@ -72,59 +219,17 @@ class ActaController extends Controller
         $category = strtoupper($request->input('category', 'TI'));
         if (!in_array($category, ['TI', 'OTRO'])) $category = 'TI';
 
-        // Verificar que la asignación tiene activos de esa categoría
-        $hasAssets = $assignment->assignmentAssets()
-            ->whereNull('returned_at')
-            ->whereHas('asset.type', fn($q) => $q->where('category', $category))
-            ->exists();
+        $acta = Acta::generateDeliveryForAssignment($assignment, $category, auth()->user());
 
-        if (!$hasAssets) {
+        if (!$acta) {
             return back()->with('error', "Esta asignación no tiene activos de categoría {$category}.");
         }
 
-        // Si ya existe un acta activa para esta asignación+categoría, redirigir
-        $existing = $assignment->actas()
-            ->where('asset_category', $category)
-            ->whereNotIn('status', [Acta::STATUS_ANULADA])
-            ->latest()
-            ->first();
-
-        if ($existing) {
+        if (!$acta->wasRecentlyCreated) {
             return redirect()
-                ->route('actas.show', $existing)
+                ->route('actas.show', $acta)
                 ->with('info', 'Ya existe un acta activa para esta asignación.');
         }
-
-        $acta = Acta::create([
-            'assignment_id'  => $assignment->id,
-            'acta_number'    => Acta::generateActaNumber($category),
-            'acta_type'      => 'entrega',
-            'asset_category' => $category,
-            'status'         => Acta::STATUS_BORRADOR,
-            'generated_by'   => auth()->id(),
-        ]);
-
-        // Crear firmas pendientes: colaborador + responsable (usuario actual)
-        $collaborator = $assignment->collaborator;
-
-        ActaSignature::create([
-            'acta_id'      => $acta->id,
-            'signer_role'  => 'collaborator',
-            'signer_name'  => $collaborator->full_name,
-            'signer_email' => $collaborator->email,
-            'token'        => ActaSignature::generateToken(),
-            'token_expires_at' => now()->addDays(7),
-        ]);
-
-        ActaSignature::create([
-            'acta_id'       => $acta->id,
-            'signer_role'   => 'responsible',
-            'signer_name'   => auth()->user()->name,
-            'signer_email'  => auth()->user()->email,
-            'signer_user_id' => auth()->id(),
-            'token'         => ActaSignature::generateToken(),
-            'token_expires_at' => now()->addDays(7),
-        ]);
 
         return redirect()
             ->route('actas.show', $acta)
@@ -146,18 +251,25 @@ class ActaController extends Controller
             return back()->with('error', 'No se puede enviar un acta anulada.');
         }
 
+        // Requerimos PDF final para adjuntar
+        if (!$acta->pdf_path || !Storage::exists($acta->pdf_path)) {
+            return back()->with('error', 'Primero genera el PDF final para poder enviarlo por correo.');
+        }
+
         // Validar emails ingresados
         $request->validate([
             'emails'   => ['required', 'array'],
             'emails.*' => ['required', 'email'],
+            'third_email' => ['nullable', 'email'],
         ], [
             'emails.*.required' => 'Todos los correos son obligatorios.',
             'emails.*.email'    => 'Ingresa un correo válido.',
         ]);
 
         $customEmails = $request->input('emails', []);
+        $thirdEmail   = $request->input('third_email');
 
-        $sent = 0;
+        $recipients = [];
         foreach ($acta->signatures as $signature) {
             if ($signature->isSigned()) continue;
 
@@ -171,16 +283,27 @@ class ActaController extends Controller
                 $signature->update(['signer_email' => $email]);
             }
 
-            Mail::to($email)->send(new ActaSigningRequest($signature));
-            $sent++;
+            $recipients[] = $email;
         }
+
+        if ($thirdEmail) {
+            $recipients[] = $thirdEmail;
+        }
+
+        $recipients = array_values(array_unique(array_filter($recipients)));
+        if (empty($recipients)) {
+            return back()->with('error', 'No hay correos destino para enviar.');
+        }
+
+        $pdfAbsolutePath = storage_path('app/' . $acta->pdf_path);
+        Mail::to($recipients)->send(new ActaPdfFinalMail($acta, $pdfAbsolutePath));
 
         $acta->update([
             'status'  => Acta::STATUS_ENVIADA,
             'sent_at' => now(),
         ]);
 
-        return back()->with('success', "Acta enviada para firma — {$sent} correo(s) despachados.");
+        return back()->with('success', 'Acta enviada por correo con el PDF adjunto.');
     }
 
     /*
@@ -204,7 +327,7 @@ class ActaController extends Controller
             return view('sign.acta_expired', compact('signature'));
         }
 
-        $signature->load(['acta.assignment.collaborator', 'acta.assignment.activeAssets.asset.assetType']);
+        $signature->load(['acta.assignment.collaborator', 'acta.assignment.activeAssets.asset.type']);
 
         return view('sign.acta', compact('signature'));
     }
@@ -304,9 +427,14 @@ class ActaController extends Controller
      */
     public function downloadPdf(Acta $acta)
     {
+        // Si ya existe un PDF final guardado, lo descargamos tal cual
+        if ($acta->pdf_path && Storage::exists($acta->pdf_path)) {
+            return response()->download(storage_path('app/' . $acta->pdf_path), basename($acta->pdf_path));
+        }
+
         $acta->load([
             'assignment.collaborator',
-            'assignment.activeAssets.asset.assetType',
+            'assignment.activeAssets.asset.type',
             'generatedBy',
             'signatures',
         ]);
@@ -324,9 +452,14 @@ class ActaController extends Controller
      */
     public function previewPdf(Acta $acta)
     {
+        // Si ya existe un PDF final guardado, lo mostramos en el navegador
+        if ($acta->pdf_path && Storage::exists($acta->pdf_path)) {
+            return response()->file(storage_path('app/' . $acta->pdf_path));
+        }
+
         $acta->load([
             'assignment.collaborator',
-            'assignment.activeAssets.asset.assetType',
+            'assignment.activeAssets.asset.type',
             'generatedBy',
             'signatures',
         ]);
@@ -335,6 +468,70 @@ class ActaController extends Controller
             ->setPaper('letter', 'portrait');
 
         return $pdf->stream($acta->acta_number . '.pdf');
+    }
+
+    /**
+     * Genera el PDF final a partir del Excel (final si existe, si no borrador).
+     * Requiere LibreOffice (soffice) disponible en el sistema.
+     */
+    public function generatePdfFinal(Request $request, Acta $acta)
+    {
+        $xlsxPath = $acta->xlsx_final_path ?: $acta->xlsx_draft_path;
+        if (!$xlsxPath || !Storage::exists($xlsxPath)) {
+            return back()->with('error', 'Primero genera el Excel borrador y/o sube el Excel final.');
+        }
+
+        $soffice = env('LIBREOFFICE_BIN', 'soffice');
+
+        $inputFile  = storage_path('app/' . $xlsxPath);
+        $outDir     = storage_path('app/actas/pdf-final');
+        $tmpOutDir  = storage_path('app/actas/pdf-final/tmp');
+
+        if (!is_dir($tmpOutDir)) {
+            @mkdir($tmpOutDir, 0777, true);
+        }
+
+        // Convertir Excel → PDF (headless)
+        $process = new Process([
+            $soffice,
+            '--headless',
+            '--nologo',
+            '--nofirststartwizard',
+            '--convert-to', 'pdf',
+            '--outdir', $tmpOutDir,
+            $inputFile,
+        ]);
+        $process->setTimeout(120);
+        $process->run();
+
+        if (!$process->isSuccessful()) {
+            return back()->with('error',
+                'No se pudo generar el PDF desde Excel. Verifica que LibreOffice esté instalado y que el comando "soffice" exista, o define LIBREOFFICE_BIN en .env.'
+            );
+        }
+
+        // LibreOffice genera un PDF con el mismo nombre base del archivo
+        $expected = pathinfo($inputFile, PATHINFO_FILENAME) . '.pdf';
+        $generated = $tmpOutDir . DIRECTORY_SEPARATOR . $expected;
+
+        if (!file_exists($generated)) {
+            return back()->with('error', 'La conversión se ejecutó pero no se encontró el PDF resultante.');
+        }
+
+        if (!is_dir($outDir)) {
+            @mkdir($outDir, 0777, true);
+        }
+
+        $finalName = $acta->acta_number . '.pdf';
+        $finalPath = 'actas/pdf-final/' . $finalName;
+        Storage::put($finalPath, file_get_contents($generated));
+        @unlink($generated);
+
+        $acta->update(['pdf_path' => $finalPath]);
+
+        return redirect()
+            ->route('actas.show', $acta)
+            ->with('success', 'PDF final generado correctamente desde el Excel.');
     }
 
     /*

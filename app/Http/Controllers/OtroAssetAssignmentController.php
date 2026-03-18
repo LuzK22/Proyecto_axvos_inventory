@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Area;
+use App\Models\Acta;
 use App\Models\Asset;
 use App\Models\Assignment;
 use App\Models\AssignmentAsset;
@@ -97,6 +98,9 @@ class OtroAssetAssignmentController extends Controller
                 'assigned_at'   => now(),
             ]);
         }
+
+        // Generar acta de ENTREGA automática para OTRO (si aplica y sin duplicar)
+        Acta::generateDeliveryForAssignment($assignment, 'OTRO', auth()->user());
 
         return redirect()
             ->route('assets.assignments.show', $assignment)
