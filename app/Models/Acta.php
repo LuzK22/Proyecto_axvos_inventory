@@ -207,13 +207,7 @@ class Acta extends Model
 
         // Verificar que la asignación tiene activos de esa categoría (aún no devueltos)
         $hasAssets = $category === 'ALL'
-            ? (clone $assetsQuery)
-                ->with('asset.type')
-                ->get()
-                ->pluck('asset.type.category')
-                ->filter()
-                ->unique()
-                ->count() >= 2
+            ? (clone $assetsQuery)->exists()
             : (clone $assetsQuery)
                 ->whereHas('asset.type', fn($q) => $q->where('category', $category))
                 ->exists();

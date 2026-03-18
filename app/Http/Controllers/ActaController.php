@@ -465,7 +465,13 @@ class ActaController extends Controller
             return view('sign.acta_expired', compact('signature'));
         }
 
-        $signature->load(['acta.assignment.collaborator', 'acta.assignment.activeAssets.asset.type']);
+        $signature->load([
+            'acta.assignment.collaborator',
+            'acta.assignment.area',
+            'acta.assignment.assignmentAssets.asset.type',
+            'acta.generatedBy',
+            'acta.signatures',
+        ]);
 
         return view('sign.acta', compact('signature'));
     }
@@ -572,7 +578,8 @@ class ActaController extends Controller
 
         $acta->load([
             'assignment.collaborator',
-            'assignment.activeAssets.asset.type',
+            'assignment.area',
+            'assignment.assignmentAssets.asset.type',
             'generatedBy',
             'signatures',
         ]);
@@ -597,7 +604,8 @@ class ActaController extends Controller
 
         $acta->load([
             'assignment.collaborator',
-            'assignment.activeAssets.asset.type',
+            'assignment.area',
+            'assignment.assignmentAssets.asset.type',
             'generatedBy',
             'signatures',
         ]);
