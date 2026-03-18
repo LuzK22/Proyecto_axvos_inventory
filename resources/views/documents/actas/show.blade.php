@@ -23,6 +23,8 @@
     </div>
 @endif
 
+@php($showTechColumns = $acta->hasTechAssets())
+
 <div class="row">
     {{-- ── Columna principal ─────────────────────────────────── --}}
     <div class="col-lg-8">
@@ -62,7 +64,7 @@
                 <div class="row">
                     <div class="col-sm-4">
                         <small class="text-muted d-block">Tipo de acta</small>
-                        <strong>{{ ucfirst($acta->acta_type) }}</strong>
+                        <strong>{{ ucfirst($acta->acta_type) }} / {{ $acta->asset_category_label }}</strong>
                     </div>
                     <div class="col-sm-4">
                         <small class="text-muted d-block">Colaborador</small>
@@ -87,7 +89,7 @@
                 <h6 class="mb-0 font-weight-bold">
                     <i class="fas fa-laptop mr-1 text-secondary"></i>
                     Activos incluidos
-                    <span class="badge badge-light ml-1">{{ $acta->assignment->activeAssets->count() }}</span>
+                    <span class="badge badge-light ml-1">{{ $actaAssets->count() }}</span>
                 </h6>
             </div>
             <div class="card-body p-0">
@@ -99,24 +101,82 @@
                             <th>Tipo</th>
                             <th>Marca / Modelo</th>
                             <th>Serial</th>
+                            @if($showTechColumns)
+                                <th>Etiqueta Inventario</th>
+                                <th>Activo Fijo</th>
+                            @endif
                         </tr>
                     </thead>
                     <tbody>
-                        @forelse($acta->assignment->activeAssets as $i => $aa)
+                        @forelse($actaAssets as $i => $aa)
                         <tr>
                             <td class="text-muted">{{ $i + 1 }}</td>
                             <td><code>{{ $aa->asset->internal_code ?? '—' }}</code></td>
                             <td>{{ $aa->asset->type?->name ?? '—' }}</td>
                             <td>{{ trim(($aa->asset->brand ?? '') . ' ' . ($aa->asset->model ?? '')) ?: '—' }}</td>
                             <td class="text-muted small">{{ $aa->asset->serial ?? '—' }}</td>
+                            @if($showTechColumns)
+                                <td class="text-muted small">{{ $aa->asset->asset_tag ?? '—' }}</td>
+                                <td class="text-muted small">{{ $aa->asset->fixed_asset_code ?? '—' }}</td>
+                            @endif
                         </tr>
                         @empty
                         <tr>
-                            <td colspan="5" class="text-center text-muted py-3">Sin activos registrados</td>
+                            <td colspan="{{ $showTechColumns ? 7 : 5 }}" class="text-center text-muted py-3">Sin activos registrados</td>
                         </tr>
                         @endforelse
                     </tbody>
                 </table>
+            </div>
+        </div>
+
+        <div class="card shadow-sm mb-3" style="border-top:3px solid #2563eb;">
+            <div class="card-header py-2">
+                <h6 class="mb-0 font-weight-bold">
+                    <i class="fas fa-edit mr-1 text-primary"></i> Edición web del acta
+                </h6>
+            </div>
+            <div class="card-body">
+                @if(!$template)
+                    <div class="alert alert-warning mb-0">
+                        No hay una plantilla activa para esta categoría. Activa una plantilla antes de editar o generar el Excel.
+                    </div>
+                @elseif($editableFields->isEmpty())
+                    <div class="alert alert-light border mb-0">
+                        La plantilla activa no tiene campos editables de cabecera. Puedes configurar campos no iterables en la plantilla para habilitar esta edición web.
+                    </div>
+                @else
+                    <form method="POST" action="{{ route('actas.fields.update', $acta) }}">
+                        @csrf
+                        <div class="row">
+                            @foreach($editableFields as $field)
+                                <div class="col-md-{{ $field['input_type'] === 'textarea' ? '12' : '6' }}">
+                                    <div class="form-group">
+                                        <label class="font-weight-bold">{{ $field['label'] }}</label>
+                                        @if($field['input_type'] === 'textarea')
+                                            <textarea name="fields[{{ $field['key'] }}]" rows="3" class="form-control">{{ old('fields.'.$field['key'], $field['value']) }}</textarea>
+                                        @else
+                                            <input
+                                                type="{{ $field['input_type'] }}"
+                                                name="fields[{{ $field['key'] }}]"
+                                                class="form-control"
+                                                value="{{ old('fields.'.$field['key'], $field['value']) }}">
+                                        @endif
+                                        <small class="text-muted d-block mt-1"><code>{{ $field['key'] }}</code></small>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+
+                        <div class="alert alert-light border mb-3">
+                            <strong>Importante:</strong> los datos por activo se generan automáticamente desde la asignación. En actas TI ya se incluyen “Etiqueta Inventario” y “Activo Fijo” en la vista y en la exportación.
+                        </div>
+
+                        <button class="btn btn-primary">
+                            <i class="fas fa-save mr-1"></i> Guardar edición web
+                        </button>
+                    </form>
+                @endif
             </div>
         </div>
 
@@ -135,7 +195,7 @@
                 <form method="POST" action="{{ route('actas.excel.draft.generate', $acta) }}" class="mb-2">
                     @csrf
                     <button class="btn btn-sm btn-success btn-block">
-                        <i class="fas fa-magic mr-1"></i> Generar Excel borrador
+                        <i class="fas fa-magic mr-1"></i> Generar Excel desde edición web
                     </button>
                 </form>
 
@@ -147,6 +207,7 @@
 
                 <form method="POST" action="{{ route('actas.excel.final.upload', $acta) }}" enctype="multipart/form-data">
                     @csrf
+                    <small class="text-muted d-block mb-2">Subida manual opcional, solo como respaldo.</small>
                     <div class="custom-file mb-2">
                         <input type="file" class="custom-file-input" id="excel_final" name="excel_final" accept=".xlsx" required>
                         <label class="custom-file-label" for="excel_final">Subir Excel final...</label>

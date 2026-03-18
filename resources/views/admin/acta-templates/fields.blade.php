@@ -12,7 +12,7 @@
             <a href="{{ route('admin.acta-templates.edit', $template) }}" class="btn btn-outline-secondary btn-sm">
                 <i class="fas fa-edit mr-1"></i> Editar plantilla
             </a>
-            <a href="{{ route('admin.acta-templates.index') }}" class="btn btn-secondary btn-sm">
+            <a href="{{ route('admin.acta-templates.category', ['category' => strtolower($template->asset_category)]) }}" class="btn btn-secondary btn-sm">
                 <i class="fas fa-arrow-left mr-1"></i> Volver
             </a>
         </div>
@@ -22,6 +22,13 @@
 @section('content')
 
 @include('partials._alerts')
+
+@if($template->asset_category === 'TI')
+    <div class="alert alert-info shadow-sm">
+        <strong>Campos TI sugeridos:</strong>
+        <code>asset_tag</code> para “Etiqueta Inventario” y <code>fixed_asset_code</code> para “Activo Fijo”.
+    </div>
+@endif
 
 <div class="row">
     <div class="col-lg-4">
@@ -180,4 +187,3 @@ function fillEdit(id, key, label, cell, iterable, order) {
 }
 </script>
 @stop
-

@@ -5,8 +5,8 @@ namespace App\Http\Controllers;
 use App\Mail\ActaSigningRequest;
 use App\Mail\ActaPdfFinalMail;
 use App\Models\Acta;
+use App\Models\ActaFieldValue;
 use App\Models\ActaSignature;
-use App\Models\ActaExcelTemplateField;
 use App\Models\Assignment;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
@@ -53,12 +53,34 @@ class ActaController extends Controller
     {
         $acta->load([
             'assignment.collaborator',
-            'assignment.activeAssets.asset.type',
+            'assignment.assignmentAssets.asset.type',
             'generatedBy',
             'signatures.signerUser',
+            'fieldValues',
         ]);
 
-        return view('documents.actas.show', compact('acta'));
+        $template = $acta->activeExcelTemplate();
+        if ($template) {
+            $template->load('fields');
+        }
+
+        $actaAssets = $acta->scopedAssignmentAssets();
+        $manual = $acta->fieldValues->pluck('value', 'field_key')->toArray();
+
+        $editableFields = collect($template?->fields ?? [])
+            ->where('is_iterable', false)
+            ->map(function ($field) use ($acta, $manual) {
+                $default = $manual[$field->field_key] ?? $this->resolveBaseFieldValue($acta, $field->field_key);
+                return [
+                    'key'        => $field->field_key,
+                    'label'      => $field->field_label,
+                    'value'      => $default,
+                    'input_type' => $this->guessFieldInputType($field->field_key, $field->field_label),
+                ];
+            })
+            ->values();
+
+        return view('documents.actas.show', compact('acta', 'template', 'actaAssets', 'editableFields'));
     }
 
     /*
@@ -88,12 +110,7 @@ class ActaController extends Controller
         $sheet = $spreadsheet->getActiveSheet();
 
         $category = strtoupper($acta->asset_category ?? 'TI');
-
-        // Activos incluidos: solo categoría correspondiente y no devueltos
-        $assets = $acta->assignment->assignmentAssets
-            ->whereNull('returned_at')
-            ->filter(fn($aa) => strtoupper($aa->asset?->type?->category ?? '') === $category)
-            ->values();
+        $assets = $acta->scopedAssignmentAssets()->values();
 
         if ($assets->isEmpty()) {
             return back()->with('error', 'Esta acta no tiene activos de la categoría correspondiente.');
@@ -190,18 +207,104 @@ class ActaController extends Controller
         return response()->download(storage_path('app/' . $acta->xlsx_final_path), basename($acta->xlsx_final_path));
     }
 
+    public function updateWebFields(Request $request, Acta $acta)
+    {
+        $template = $acta->activeExcelTemplate();
+        if (!$template) {
+            return back()->with('error', 'No existe una plantilla activa para editar esta acta desde la web.');
+        }
+
+        $template->load('fields');
+
+        $allowedKeys = $template->fields
+            ->where('is_iterable', false)
+            ->pluck('field_key')
+            ->all();
+
+        $data = $request->input('fields', []);
+
+        foreach ($allowedKeys as $key) {
+            ActaFieldValue::updateOrCreate(
+                ['acta_id' => $acta->id, 'field_key' => $key],
+                [
+                    'value'      => $data[$key] ?? null,
+                    'updated_by' => auth()->id(),
+                ]
+            );
+        }
+
+        $acta->update([
+            'xlsx_draft_path' => null,
+            'xlsx_final_path' => null,
+            'pdf_path'        => null,
+        ]);
+
+        return redirect()
+            ->route('actas.show', $acta)
+            ->with('success', 'Campos del acta guardados correctamente. Ahora puedes generar el Excel final desde la web.');
+    }
+
     private function resolveIterableValue(string $key, $assignmentAsset): string
     {
         $asset = $assignmentAsset->asset;
         return match ($key) {
             'asset_internal_code', 'asset_code' => (string) ($asset?->internal_code ?? ''),
+            'asset_category' => (string) ($asset?->type?->category ?? ''),
             'asset_type' => (string) ($asset?->type?->name ?? ''),
             'asset_brand' => (string) ($asset?->brand ?? ''),
             'asset_model' => (string) ($asset?->model ?? ''),
             'asset_serial' => (string) ($asset?->serial ?? ''),
-            'asset_tag' => (string) ($asset?->asset_tag ?? ''),
+            'asset_tag', 'inventory_tag' => (string) ($asset?->asset_tag ?? ''),
+            'fixed_asset_code' => (string) ($asset?->fixed_asset_code ?? ''),
             default => '',
         };
+    }
+
+    private function resolveBaseFieldValue(Acta $acta, string $key): string
+    {
+        $acta->loadMissing([
+            'assignment.collaborator',
+            'assignment.area',
+            'generatedBy',
+        ]);
+
+        $recipientName = $acta->assignment->collaborator?->full_name
+            ?? ($acta->assignment->area ? ('Área: ' . $acta->assignment->area->name) : '—');
+
+        return (string) match ($key) {
+            'acta_number'           => $acta->acta_number,
+            'acta_type'             => $acta->type_label,
+            'asset_category'        => $acta->asset_category_label,
+            'collaborator_name'     => $acta->assignment->collaborator?->full_name ?? '',
+            'collaborator_document' => $acta->assignment->collaborator?->document ?? '',
+            'collaborator_email'    => $acta->assignment->collaborator?->email ?? '',
+            'area_name'             => $acta->assignment->area?->name ?? '',
+            'recipient_name'        => $recipientName,
+            'assignment_date'       => optional($acta->assignment->assignment_date)->format('Y-m-d') ?? '',
+            'delivery_date'         => now()->format('Y-m-d'),
+            'responsible_name'      => $acta->generatedBy?->name ?? '',
+            'responsible_email'     => $acta->generatedBy?->email ?? '',
+            default                 => '',
+        };
+    }
+
+    private function guessFieldInputType(string $key, string $label): string
+    {
+        $haystack = strtolower($key . ' ' . $label);
+
+        if (str_contains($haystack, 'fecha') || str_contains($haystack, '_date') || str_contains($haystack, 'date_')) {
+            return 'date';
+        }
+
+        if (str_contains($haystack, 'nota') || str_contains($haystack, 'observ') || str_contains($haystack, 'claus') || str_contains($haystack, 'footer') || str_contains($haystack, 'header')) {
+            return 'textarea';
+        }
+
+        if (str_contains($haystack, 'email') || str_contains($haystack, 'correo')) {
+            return 'email';
+        }
+
+        return 'text';
     }
 
     /*
@@ -215,14 +318,14 @@ class ActaController extends Controller
      */
     public function generate(Request $request, Assignment $assignment)
     {
-        // Categoría: TI (activos tecnológicos) u OTRO (otros activos)
+        // Categoría: TI, OTRO o ALL/MIXTA
         $category = strtoupper($request->input('category', 'TI'));
-        if (!in_array($category, ['TI', 'OTRO'])) $category = 'TI';
+        if (!in_array($category, ['TI', 'OTRO', 'ALL'])) $category = 'TI';
 
         $acta = Acta::generateDeliveryForAssignment($assignment, $category, auth()->user());
 
         if (!$acta) {
-            return back()->with('error', "Esta asignación no tiene activos de categoría {$category}.");
+            return back()->with('error', "Esta asignación no tiene activos compatibles para el tipo de acta {$category}.");
         }
 
         if (!$acta->wasRecentlyCreated) {
