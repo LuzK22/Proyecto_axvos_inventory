@@ -289,11 +289,6 @@
         @endif
 
         {{-- Firma interna del gestor --}}
-        @php
-            $mySignature = $acta->signatures->where('signer_user_id', auth()->id())->first()
-                ?? $acta->signatures->where('signer_role', 'responsible')->where('signed_at', null)->first();
-        @endphp
-
         @if($mySignature && !$mySignature->isSigned())
         <div class="card shadow-sm mb-3" style="border-top:3px solid #0f766e;">
             <div class="card-header py-2">
