@@ -25,7 +25,13 @@
 
 @if(in_array($template->asset_category, ['TI', 'ALL'], true))
     <div class="alert alert-info shadow-sm">
-        <strong>Campos sugeridos para plantillas {{ $template->asset_category === 'ALL' ? 'MIXTAS' : 'TI' }}:</strong>
+        <strong>
+            Campos sugeridos para plantillas {{ $template->asset_category === 'ALL' ? 'MIXTAS' : 'TI' }}:
+        </strong>
+        <code>asset_tag</code> para “Etiqueta Inventario” y 
+        <code>fixed_asset_code</code> para “Activo Fijo”.
+    </div>
+@endif
         <code>asset_tag</code> para “Etiqueta Inventario” y <code>fixed_asset_code</code> para “Activo Fijo”.
     </div>
 @endif

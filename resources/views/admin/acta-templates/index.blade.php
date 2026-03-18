@@ -8,11 +8,10 @@
         'ALL' => 'Actas MIXTAS',
         default => 'Todas',
     };
-
-    $categoryLabel = fn ($category) => match(strtoupper((string) $category)) {
-        'ALL' => 'MIXTA',
-        default => strtoupper((string) $category),
-    };
+$categoryLabel = fn ($category) => match(strtoupper((string) $category)) {
+    'ALL' => 'MIXTA',
+    default => strtoupper((string) $category),
+};
 @endphp
 
 @section('title', 'Plantillas Excel de Actas')

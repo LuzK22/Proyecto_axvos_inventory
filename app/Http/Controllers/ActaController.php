@@ -82,8 +82,14 @@ class ActaController extends Controller
         $mySignature = $acta->signatures->where('signer_user_id', auth()->id())->first()
             ?? $acta->signatures->where('signer_role', 'responsible')->where('signed_at', null)->first();
 
-        return view('documents.actas.show', compact('acta', 'template', 'actaAssets', 'editableFields', 'mySignature'));
-    }
+        return view('documents.actas.show', compact(
+            'acta',
+            'template',
+            'actaAssets',
+            'editableFields',
+            'mySignature'
+));
+}
 
     /*
     |--------------------------------------------------------------------------
