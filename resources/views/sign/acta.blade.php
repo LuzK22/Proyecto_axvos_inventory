@@ -28,6 +28,9 @@
 </head>
 <body>
 
+@php($actaAssets = $signature->acta->scopedAssignmentAssets())
+@php($showTechColumns = $signature->acta->hasTechAssets())
+
 <div class="sign-wrapper">
 
     {{-- Cabecera --}}
@@ -58,19 +61,27 @@
                     <th>Tipo</th>
                     <th>Marca / Modelo</th>
                     <th>Serial</th>
+                    @if($showTechColumns)
+                        <th>Etiqueta Inventario</th>
+                        <th>Activo Fijo</th>
+                    @endif
                 </tr>
             </thead>
             <tbody>
-                @forelse($signature->acta->assignment->activeAssets as $i => $aa)
+                @forelse($actaAssets as $i => $aa)
                 <tr>
                     <td class="text-muted">{{ $i + 1 }}</td>
-                    <td><code>{{ $aa->asset->asset_code ?? '—' }}</code></td>
-                    <td>{{ $aa->asset->assetType->name ?? '—' }}</td>
+                    <td><code>{{ $aa->asset->internal_code ?? '—' }}</code></td>
+                    <td>{{ $aa->asset->type?->name ?? '—' }}</td>
                     <td>{{ trim(($aa->asset->brand ?? '') . ' ' . ($aa->asset->model ?? '')) ?: '—' }}</td>
                     <td class="text-muted">{{ $aa->asset->serial ?? '—' }}</td>
+                    @if($showTechColumns)
+                        <td class="text-muted">{{ $aa->asset->asset_tag ?? '—' }}</td>
+                        <td class="text-muted">{{ $aa->asset->fixed_asset_code ?? '—' }}</td>
+                    @endif
                 </tr>
                 @empty
-                <tr><td colspan="5" class="text-center text-muted">Sin activos</td></tr>
+                <tr><td colspan="{{ $showTechColumns ? 7 : 5 }}" class="text-center text-muted">Sin activos</td></tr>
                 @endforelse
             </tbody>
         </table>

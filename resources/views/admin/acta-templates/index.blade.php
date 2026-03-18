@@ -1,5 +1,15 @@
 @extends('adminlte::page')
 
+@php
+    $scope = strtoupper($selectedCategory ?? '');
+    $scopeLabel = match($scope) {
+        'TI' => 'Actas TI',
+        'OTRO' => 'Actas OTRO',
+        'ALL' => 'Actas MIXTAS',
+        default => 'Todas',
+    };
+@endphp
+
 @section('title', 'Plantillas Excel de Actas')
 
 @section('content_header')
@@ -9,7 +19,11 @@
             Plantillas Excel de Actas
         </h1>
         <div>
-            <a href="{{ route('admin.acta-templates.create') }}" class="btn btn-success btn-sm">
+            <a href="{{ match($scope ?? '') {
+                'OTRO' => route('admin.acta-templates.create.otro'),
+                'ALL' => route('admin.acta-templates.create.mixta'),
+                default => route('admin.acta-templates.create.ti'),
+            } }}" class="btn btn-success btn-sm">
                 <i class="fas fa-plus mr-1"></i> Subir plantilla
             </a>
             <a href="{{ route('admin.settings') }}" class="btn btn-secondary btn-sm">
@@ -23,7 +37,18 @@
 
 @include('partials._alerts')
 
+<div class="mb-3 d-flex flex-wrap">
+    <a href="{{ route('admin.acta-templates.ti') }}" class="btn btn-sm mr-2 mb-2 {{ $scope === 'TI' ? 'btn-primary' : 'btn-outline-primary' }}">TI</a>
+    <a href="{{ route('admin.acta-templates.otro') }}" class="btn btn-sm mr-2 mb-2 {{ $scope === 'OTRO' ? 'btn-secondary' : 'btn-outline-secondary' }}" style="{{ $scope === 'OTRO' ? 'background:#7c3aed;border-color:#7c3aed;color:#fff;' : 'color:#7c3aed;border-color:#7c3aed;' }}">OTRO</a>
+    <a href="{{ route('admin.acta-templates.mixta') }}" class="btn btn-sm mr-2 mb-2 {{ $scope === 'ALL' ? 'btn-success' : 'btn-outline-success' }}">MIXTA</a>
+    <a href="{{ route('admin.acta-templates.index') }}" class="btn btn-sm mb-2 {{ empty($scope) ? 'btn-dark' : 'btn-outline-dark' }}">Ver todas</a>
+</div>
+
 <div class="card shadow-sm">
+    <div class="card-header py-2 bg-white">
+        <strong>{{ $scopeLabel }}</strong>
+        <small class="text-muted d-block">Administra plantillas separadas para TI, OTRO y MIXTA.</small>
+    </div>
     <div class="card-body p-0">
         <table class="table table-hover mb-0">
             <thead class="thead-light">
@@ -83,4 +108,3 @@
 </div>
 
 @stop
-
