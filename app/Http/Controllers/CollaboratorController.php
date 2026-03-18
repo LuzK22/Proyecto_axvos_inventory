@@ -47,7 +47,7 @@ class CollaboratorController extends Controller
         $collaborators = $query->orderBy('full_name')->paginate(20)->withQueryString();
         $branches      = Branch::where('active', true)->orderBy('name')->get();
 
-        return view('collaborators.index', compact('collaborators', 'branches', 'activeFilter'));
+        return view('Collaborators.index', compact('collaborators', 'branches', 'activeFilter'));
     }
 
     /* =========================================================
@@ -57,7 +57,7 @@ class CollaboratorController extends Controller
     public function create()
     {
         $branches = Branch::where('active', true)->orderBy('name')->get();
-        return view('collaborators.create', compact('branches'));
+        return view('Collaborators.create', compact('branches'));
     }
 
     /* =========================================================
@@ -94,7 +94,7 @@ class CollaboratorController extends Controller
     public function edit(Collaborator $collaborator)
     {
         $branches = Branch::where('active', true)->orderBy('name')->get();
-        return view('collaborators.edit', compact('collaborator', 'branches'));
+        return view('Collaborators.edit', compact('collaborator', 'branches'));
     }
 
     /* =========================================================
@@ -169,7 +169,7 @@ class CollaboratorController extends Controller
             'history'  => $assignmentHistory->count(),
         ];
 
-        return view('collaborators.show', compact(
+        return view('Collaborators.show', compact(
             'collaborator',
             'tiItems',
             'otroItems',

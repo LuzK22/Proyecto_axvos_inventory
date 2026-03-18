@@ -2,8 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-
 class ReportController extends Controller
 {
     /*
@@ -24,17 +22,30 @@ class ReportController extends Controller
      */
     public function global()
     {
-        // Vista temporal
         return view('reports.global');
     }
 
     /**
-     * Reportes normales
+     * Reportes TI
+     */
+    public function tech()
+    {
+        return view('tech.reports.hub');
+    }
+
+    /**
+     * Reportes OTRO
+     */
+    public function assets()
+    {
+        return view('assets.reports.hub');
+    }
+
+    /**
+     * Reportes genéricos
      */
     public function index()
     {
-        // Vista temporal
         return view('reports.index');
     }
 }
-

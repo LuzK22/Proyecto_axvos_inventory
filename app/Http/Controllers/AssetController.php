@@ -196,7 +196,7 @@ class AssetController extends Controller
      | PLACEHOLDERS — módulos pendientes de desarrollo
      ========================================================= */
     public function history()   { return view('tech.history.index'); }
-    public function disposals() { return view('tech.disposals.index'); }
+    public function disposals() { return view('tech.disposals.hub'); }
 
     // Activos de categoría OTRO (muebles, equipos de oficina, etc.)
     public function assetsIndex()
@@ -209,5 +209,5 @@ class AssetController extends Controller
 
     public function assetsAssignments() { return view('assets.assignments.index'); }
     public function assetsHistory()     { return view('assets.history.index'); }
-    public function assetsDisposals()   { return view('assets.disposals.index'); }
+    public function assetsDisposals()   { return view('assets.disposals.hub'); }
 }

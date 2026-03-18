@@ -86,6 +86,27 @@ class AssetTypeController extends Controller
     }
 
     /**
+     * Eliminar tipo
+     */
+    public function destroy(AssetType $assetType)
+    {
+        if ($assetType->assets()->exists()) {
+            $assetType->update(['active' => false]);
+
+            return redirect()
+                ->route('asset-types.index', $assetType->category)
+                ->with('warning', 'El tipo tiene activos relacionados; se desactivó en lugar de eliminarse.');
+        }
+
+        $category = $assetType->category;
+        $assetType->delete();
+
+        return redirect()
+            ->route('asset-types.index', $category)
+            ->with('success', 'Tipo de activo eliminado correctamente.');
+    }
+
+    /**
      * Validar categoría
      */
     private function validateCategory(string $category): void
