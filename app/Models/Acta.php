@@ -172,7 +172,11 @@ class Acta extends Model
     public static function generateActaNumber(string $category = 'TI', string $type = 'entrega'): string
     {
         $year      = now()->year;
-        $catPrefix = $category === 'OTRO' ? 'OT' : 'TI';
+        $catPrefix = match ($category) {
+            'OTRO' => 'OT',
+            'ALL'  => 'MX',
+            default => 'TI',
+        };
         $prefix    = self::typePrefix($type);
         $count     = self::whereYear('created_at', $year)
                          ->where('asset_category', $category)
@@ -183,7 +187,7 @@ class Acta extends Model
     }
 
     /**
-     * Genera (o reutiliza) un Acta de ENTREGA para una asignación y categoría (TI/OTRO).
+     * Genera (o reutiliza) un Acta de ENTREGA para una asignación y categoría (TI/OTRO/ALL).
      *
      * - No genera si la asignación no tiene activos de esa categoría (no devueltos).
      * - No duplica: si ya existe un acta activa (no anulada) para assignment+category, la retorna.
@@ -193,15 +197,26 @@ class Acta extends Model
     public static function generateDeliveryForAssignment(Assignment $assignment, string $category, User $responsibleUser): ?self
     {
         $category = strtoupper($category);
-        if (!in_array($category, ['TI', 'OTRO'], true)) {
+        if (!in_array($category, ['TI', 'OTRO', 'ALL'], true)) {
             $category = 'TI';
         }
 
-        // Verificar que la asignación tiene activos de esa categoría (aún no devueltos)
-        $hasAssets = $assignment->assignmentAssets()
+        $assetsQuery = $assignment->assignmentAssets()
             ->whereNull('returned_at')
-            ->whereHas('asset.type', fn($q) => $q->where('category', $category))
-            ->exists();
+            ->whereHas('asset.type');
+
+        // Verificar que la asignación tiene activos de esa categoría (aún no devueltos)
+        $hasAssets = $category === 'ALL'
+            ? (clone $assetsQuery)
+                ->with('asset.type')
+                ->get()
+                ->pluck('asset.type.category')
+                ->filter()
+                ->unique()
+                ->count() >= 2
+            : (clone $assetsQuery)
+                ->whereHas('asset.type', fn($q) => $q->where('category', $category))
+                ->exists();
 
         if (!$hasAssets) {
             return null;
@@ -281,6 +296,37 @@ class Acta extends Model
             ->where('asset_category', 'ALL')
             ->latest()
             ->first();
+    }
+
+    public function getAssetCategoryLabelAttribute(): string
+    {
+        return match (strtoupper($this->asset_category ?? 'TI')) {
+            'TI' => 'TI',
+            'OTRO' => 'OTRO',
+            'ALL' => 'MIXTA',
+            default => strtoupper((string) $this->asset_category),
+        };
+    }
+
+    public function scopedAssignmentAssets()
+    {
+        $category = strtoupper($this->asset_category ?? 'TI');
+
+        $query = $this->assignment->assignmentAssets()
+            ->whereNull('returned_at')
+            ->with('asset.type');
+
+        if (in_array($category, ['TI', 'OTRO'], true)) {
+            $query->whereHas('asset.type', fn ($q) => $q->where('category', $category));
+        }
+
+        return $query->get();
+    }
+
+    public function hasTechAssets(): bool
+    {
+        return $this->scopedAssignmentAssets()
+            ->contains(fn ($aa) => strtoupper($aa->asset?->type?->category ?? '') === 'TI');
     }
 
     /**

@@ -7,7 +7,7 @@
         <h1 class="m-0">
             <i class="fas fa-edit text-secondary mr-2"></i> Editar Plantilla
         </h1>
-        <a href="{{ route('admin.acta-templates.index') }}" class="btn btn-secondary btn-sm">
+        <a href="{{ route('admin.acta-templates.category', ['category' => strtolower($selectedCategory ?? 'ti')]) }}" class="btn btn-secondary btn-sm">
             <i class="fas fa-arrow-left mr-1"></i> Volver
         </a>
     </div>
@@ -49,7 +49,7 @@
                         <select name="asset_category" class="form-control" required>
                             <option value="TI"   {{ $cat==='TI' ? 'selected' : '' }}>TI</option>
                             <option value="OTRO" {{ $cat==='OTRO' ? 'selected' : '' }}>OTRO</option>
-                            <option value="ALL"  {{ $cat==='ALL' ? 'selected' : '' }}>ALL (fallback)</option>
+                            <option value="ALL"  {{ $cat==='ALL' ? 'selected' : '' }}>ALL (Mixta)</option>
                         </select>
                     </div>
                 </div>
@@ -81,4 +81,3 @@
 </div>
 
 @stop
-

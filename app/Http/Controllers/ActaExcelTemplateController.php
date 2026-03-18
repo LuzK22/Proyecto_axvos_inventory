@@ -8,21 +8,36 @@ use Illuminate\Support\Facades\Storage;
 
 class ActaExcelTemplateController extends Controller
 {
-    public function index()
+    public function index(Request $request, ?string $category = null)
     {
-        $templates = ActaExcelTemplate::withCount('fields')
+        $selectedCategory = strtoupper($category ?: $request->query('category', ''));
+        if (!in_array($selectedCategory, ['TI', 'OTRO', 'ALL'], true)) {
+            $selectedCategory = null;
+        }
+
+        $query = ActaExcelTemplate::withCount('fields')
             ->orderByDesc('active')
             ->orderBy('acta_type')
             ->orderBy('asset_category')
-            ->orderBy('name')
-            ->get();
+            ->orderBy('name');
 
-        return view('admin.acta-templates.index', compact('templates'));
+        if ($selectedCategory) {
+            $query->where('asset_category', $selectedCategory);
+        }
+
+        $templates = $query->get();
+
+        return view('admin.acta-templates.index', compact('templates', 'selectedCategory'));
     }
 
-    public function create()
+    public function create(Request $request, ?string $category = null)
     {
-        return view('admin.acta-templates.create');
+        $selectedCategory = strtoupper($category ?: $request->query('category', 'TI'));
+        if (!in_array($selectedCategory, ['TI', 'OTRO', 'ALL'], true)) {
+            $selectedCategory = 'TI';
+        }
+
+        return view('admin.acta-templates.create', compact('selectedCategory'));
     }
 
     public function store(Request $request)
@@ -48,13 +63,14 @@ class ActaExcelTemplateController extends Controller
         ]);
 
         return redirect()
-            ->route('admin.acta-templates.index')
+            ->route('admin.acta-templates.category', ['category' => strtolower($request->asset_category)])
             ->with('success', 'Plantilla Excel subida correctamente. Ahora puedes mapear campos y activarla.');
     }
 
     public function edit(ActaExcelTemplate $actaExcelTemplate)
     {
-        return view('admin.acta-templates.edit', ['template' => $actaExcelTemplate]);
+        $selectedCategory = strtoupper($actaExcelTemplate->asset_category);
+        return view('admin.acta-templates.edit', ['template' => $actaExcelTemplate, 'selectedCategory' => $selectedCategory]);
     }
 
     public function update(Request $request, ActaExcelTemplate $actaExcelTemplate)
@@ -79,7 +95,7 @@ class ActaExcelTemplateController extends Controller
         $actaExcelTemplate->update($data);
 
         return redirect()
-            ->route('admin.acta-templates.index')
+            ->route('admin.acta-templates.category', ['category' => strtolower($actaExcelTemplate->asset_category)])
             ->with('success', 'Plantilla actualizada correctamente.');
     }
 
@@ -95,4 +111,3 @@ class ActaExcelTemplateController extends Controller
         return back()->with('success', 'Plantilla activada correctamente.');
     }
 }
-
