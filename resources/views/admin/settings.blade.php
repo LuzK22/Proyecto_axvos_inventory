@@ -141,11 +141,19 @@
                 <div class="alert alert-light border d-flex justify-content-between align-items-center">
                     <div>
                         <strong>Plantilla Excel (.xlsx)</strong>
-                        <div class="text-muted small">Sube/activa la plantilla y mapea campos a celdas.</div>
+                        <div class="text-muted small">Administra plantillas separadas para TI, OTRO y MIXTA.</div>
                     </div>
-                    <a href="{{ route('admin.acta-templates.index') }}" class="btn btn-sm btn-success">
-                        <i class="fas fa-file-excel mr-1"></i> Administrar plantillas
-                    </a>
+                    <div class="btn-group">
+                        <a href="{{ route('admin.acta-templates.ti') }}" class="btn btn-sm btn-primary">
+                            <i class="fas fa-laptop mr-1"></i> TI
+                        </a>
+                        <a href="{{ route('admin.acta-templates.otro') }}" class="btn btn-sm" style="background:#7c3aed;color:#fff;">
+                            <i class="fas fa-box mr-1"></i> OTRO
+                        </a>
+                        <a href="{{ route('admin.acta-templates.mixta') }}" class="btn btn-sm btn-success">
+                            <i class="fas fa-layer-group mr-1"></i> MIXTA
+                        </a>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label class="font-weight-bold">
