@@ -1,0 +1,247 @@
+/*
+ * AXVOS INVENTORY — Custom Theme
+ * Conecta. Controla. Traza.
+ * Colors: Navy #0d1b2a | Cyan #00b4d8 | White #ffffff
+ */
+
+:root {
+    --axvos-navy:  #0d1b2a;
+    --axvos-cyan:  #00b4d8;
+    --axvos-light: #7ecfea;
+    --axvos-dark:  #091420;
+}
+
+/* ── Logo en navbar superior (sidebar colapsado / móvil) ─────── */
+.navbar-brand .brand-image-xs {
+    width:  36px !important;
+    height: 36px !important;
+    max-height: 36px !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    margin-right: 8px !important;
+}
+
+/* ── Sidebar width — expanded state only ──────────────────────── */
+body:not(.sidebar-collapse) .main-sidebar,
+body:not(.sidebar-collapse) .main-sidebar.sidebar-dark-primary {
+    width: 290px !important;
+}
+body:not(.sidebar-collapse) .content-wrapper,
+body:not(.sidebar-collapse) .main-footer,
+body:not(.sidebar-collapse) .main-header.navbar {
+    margin-left: 290px !important;
+}
+
+/* ── Sidebar hover-expand in collapsed mini mode ──────────────── */
+body.sidebar-mini.sidebar-collapse .main-sidebar:hover,
+body.sidebar-mini.sidebar-collapse .main-sidebar.sidebar-focused {
+    width: 290px !important;
+}
+
+/* ── Sidebar nav link text size ────────────────────────────────── */
+.main-sidebar .nav-sidebar .nav-link {
+    font-size: 1.075rem !important;
+}
+.main-sidebar .nav-sidebar .nav-link .nav-icon {
+    font-size: 1.05rem !important;
+}
+
+/* ── Brand logo hexagon sizing ──────────────────────────────────── */
+.main-sidebar .brand-image {
+    width: 42px !important;
+    height: 48px !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    margin-top: -4px !important;
+    margin-right: 10px !important;
+}
+.main-sidebar .brand-image-xs {
+    width: 34px !important;
+    height: 38px !important;
+    border-radius: 0 !important;
+}
+.main-sidebar .brand-text {
+    margin-left: 53px !important;
+}
+
+/* ── Navbar pushmenu toggle alignment ───────────────────────────── */
+.nav-item a[data-widget="pushmenu"] {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 0.5rem 0.75rem !important;
+}
+
+/* ── Sidebar (dark navy) ───────────────────────────────────────── */
+.main-sidebar,
+.main-sidebar .nav-sidebar {
+    background-color: var(--axvos-navy) !important;
+}
+
+.main-sidebar .brand-link {
+    background-color: var(--axvos-dark) !important;
+    border-bottom: 1px solid rgba(0, 180, 216, 0.25) !important;
+}
+
+.main-sidebar .sidebar-dark-primary .nav-sidebar > .nav-item > .nav-link.active,
+.main-sidebar .sidebar-dark-primary .nav-sidebar > .nav-item > .nav-link:hover {
+    background-color: rgba(0, 180, 216, 0.18) !important;
+    color: var(--axvos-cyan) !important;
+}
+
+.main-sidebar .nav-sidebar .nav-link {
+    color: rgba(255, 255, 255, 0.75) !important;
+}
+
+.main-sidebar .nav-sidebar .nav-link:hover {
+    color: #fff !important;
+}
+
+.main-sidebar .nav-sidebar .nav-header {
+    color: var(--axvos-light) !important;
+    opacity: 0.6;
+    font-size: 0.825rem;
+    letter-spacing: 1px;
+}
+
+/* ── Top navbar ────────────────────────────────────────────────── */
+.main-header.navbar {
+    border-bottom: 2px solid var(--axvos-cyan) !important;
+}
+
+/* ── Brand logo text ───────────────────────────────────────────── */
+.brand-text {
+    font-family: 'Segoe UI', sans-serif !important;
+    font-weight: 800 !important;
+    letter-spacing: 0.5px;
+}
+
+/* ── Botones primarios con color AXVOS ─────────────────────────── */
+.btn-primary {
+    background-color: #3a57e8 !important;
+    border-color: #3a57e8 !important;
+}
+.btn-primary:hover {
+    background-color: #2d46d6 !important;
+    border-color: #2d46d6 !important;
+}
+
+/* ── Info-box icons ─────────────────────────────────────────────── */
+.info-box .info-box-icon.axvos {
+    background-color: var(--axvos-cyan) !important;
+}
+
+/* ── Card outlines con color AXVOS ─────────────────────────────── */
+.card.card-outline.card-axvos {
+    border-top: 3px solid var(--axvos-cyan) !important;
+}
+
+/* ── Badges ─────────────────────────────────────────────────────── */
+.badge-axvos {
+    background-color: var(--axvos-cyan);
+    color: #fff;
+}
+
+/* ── Links en sidebar activos ───────────────────────────────────── */
+.sidebar-dark-primary .nav-sidebar > .nav-item > .nav-link.active,
+.sidebar-dark-primary .nav-sidebar > .nav-item:hover > .nav-link {
+    background-color: rgba(0,180,216,0.15) !important;
+}
+
+/* ── Breadcrumb ─────────────────────────────────────────────────── */
+.content-header .breadcrumb-item a {
+    color: var(--axvos-cyan);
+}
+
+/* ── Table improvements ─────────────────────────────────────────── */
+.table th {
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.table code {
+    font-size: 0.82rem;
+    color: #3a57e8;
+    background: #eef1ff;
+    padding: 1px 5px;
+    border-radius: 3px;
+}
+
+/* ── Login page ─────────────────────────────────────────────────── */
+body.login-page {
+    background-color: var(--axvos-navy) !important;
+}
+
+.login-box-msg {
+    color: #fff;
+}
+
+/* ── Content wrapper: scroll vertical del área principal ────────── */
+.content-wrapper {
+    overflow-y: auto !important;
+    height: calc(100vh - 57px) !important;   /* 57px = altura del navbar */
+    scrollbar-width: thin;
+    scrollbar-color: var(--axvos-cyan) transparent;
+}
+
+/* ── Sidebar: scroll cuando el menú supera la altura de pantalla ── */
+.main-sidebar {
+    overflow: hidden !important;   /* el wrapper exterior no hace scroll */
+}
+.main-sidebar .sidebar {
+    overflow-y: auto !important;
+    height: calc(100vh - 57px) !important;  /* 57px = altura del brand-link */
+    scrollbar-width: thin;                  /* Firefox */
+    scrollbar-color: rgba(0, 180, 216, 0.65) transparent;
+}
+
+/* ── Scrollbar personalizado (Chrome / Edge / Safari) ───────────── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--axvos-cyan); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #0096b8; }
+
+/* Scrollbar área de contenido principal ────────────────────────── */
+.content-wrapper::-webkit-scrollbar { width: 5px; }
+.content-wrapper::-webkit-scrollbar-track { background: transparent; }
+.content-wrapper::-webkit-scrollbar-thumb { background: rgba(0,180,216,0.65); border-radius: 3px; }
+
+/* Scrollbar barra lateral de módulos ───────────────────────────── */
+.main-sidebar .sidebar::-webkit-scrollbar { width: 5px; }
+.main-sidebar .sidebar::-webkit-scrollbar-track { background: transparent; }
+.main-sidebar .sidebar::-webkit-scrollbar-thumb { background: rgba(0,180,216,0.65); border-radius: 3px; }
+
+/* Estado hover sidebar — clase en .main-sidebar (fixed, no en body) */
+.main-sidebar.sb-hover .sidebar::-webkit-scrollbar-thumb { background: rgba(0,180,216,0.95) !important; }
+/* Estado hover contenido — clase en body funciona para elementos normales */
+.axvos-sb-content-hover .content-wrapper::-webkit-scrollbar-thumb { background: rgba(0,180,216,0.95) !important; }
+
+/* ── Animación de entrada para cards ───────────────────────────── */
+.card {
+    transition: box-shadow 0.2s ease;
+}
+.card:hover {
+    box-shadow: 0 4px 15px rgba(0,180,216,0.12) !important;
+}
+
+/* ── Small boxes ────────────────────────────────────────────────── */
+.small-box .icon {
+    opacity: 0.15;
+}
+
+/* ── Contenedor de tabla con scroll vertical ────────────────────── */
+/* Usar class="table-scroll-container" en el div que envuelve la tabla */
+.table-scroll-container {
+    max-height: calc(100vh - 280px);  /* deja espacio para header + filtros + paginación */
+    overflow-y: auto;
+    overflow-x: auto;
+}
+/* Cabecera fija al hacer scroll */
+.table-scroll-container thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: #f4f6f9 !important;
+    box-shadow: 0 1px 0 #dee2e6;
+}

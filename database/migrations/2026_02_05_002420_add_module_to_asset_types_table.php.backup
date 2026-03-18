@@ -1,0 +1,49 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB; 
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void  // 
+    {
+        Schema::table('asset_types', function (Blueprint $table) {
+            // Agregar columna module si no existe
+            if (!Schema::hasColumn('asset_types', 'module')) {
+                $table->enum('module', ['technology', 'other_assets'])
+                    ->default('technology')
+                    ->after('prefix');
+            }
+        });
+        
+        // Actualizar tipos existentes según su categoría/prefix
+        DB::table('asset_types')
+            ->where(function ($query) {
+                $query->where('prefix', 'LIKE', 'TI-%')
+                      ->orWhere('category', 'TI');
+            })
+            ->update(['module' => 'technology']);
+            
+        DB::table('asset_types')
+            ->where(function ($query) {
+                $query->where('prefix', 'LIKE', 'OTRO-%')
+                      ->orWhere('category', '!=', 'TI');
+            })
+            ->update(['module' => 'other_assets']);
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::table('asset_types', function (Blueprint $table) {
+            $table->dropColumn('module');
+        });
+    }
+};
