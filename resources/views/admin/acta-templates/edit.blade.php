@@ -39,6 +39,7 @@
                             <option value="baja"      {{ $type==='baja' ? 'selected' : '' }}>Baja</option>
                             <option value="donacion"  {{ $type==='donacion' ? 'selected' : '' }}>Donación</option>
                             <option value="venta"     {{ $type==='venta' ? 'selected' : '' }}>Venta</option>
+                            <option value="actualizacion" {{ $type==='actualizacion' ? 'selected' : '' }}>Actualización</option>
                         </select>
                     </div>
                 </div>

@@ -198,7 +198,7 @@
                 <tr>
                     <td>{{ $i + 1 }}</td>
                     <td>{{ $aa->asset->internal_code ?? $aa->asset->asset_code ?? '—' }}</td>
-                    <td>{{ $aa->asset->type->name ?? '—' }}</td>
+                    <td>{{ $aa->asset->type?->name ?? '—' }}</td>
                     <td>{{ $aa->asset->brand ?? '—' }}</td>
                     <td>{{ $aa->asset->model ?? '—' }}</td>
                     <td>{{ $aa->asset->serial ?? '—' }}</td>

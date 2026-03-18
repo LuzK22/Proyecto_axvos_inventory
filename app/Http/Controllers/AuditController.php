@@ -16,6 +16,11 @@ class AuditController extends Controller
 {
     private const PER_PAGE = 25;
 
+    public function index(Request $request)
+    {
+        return $this->hub($request);
+    }
+
     /* =========================================================
      | HUB PRINCIPAL
      ========================================================= */

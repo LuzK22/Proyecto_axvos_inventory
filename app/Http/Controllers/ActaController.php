@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Mail\ActaSigningRequest;
 use App\Mail\ActaPdfFinalMail;
 use App\Models\Acta;
 use App\Models\ActaFieldValue;
@@ -84,13 +83,13 @@ class ActaController extends Controller
             ?? $acta->signatures->where('signer_role', 'responsible')->where('signed_at', null)->first();
 
         return view('documents.actas.show', compact(
-             'acta',
-             'template',
-             'actaAssets',
-             'editableFields',
-             'mySignature'
-         ));
-       }
+            'acta',
+            'template',
+            'actaAssets',
+            'editableFields',
+            'mySignature'
+));
+}
 
     /*
     |--------------------------------------------------------------------------
@@ -472,7 +471,13 @@ class ActaController extends Controller
             return view('sign.acta_expired', compact('signature'));
         }
 
-        $signature->load(['acta.assignment.collaborator', 'acta.assignment.activeAssets.asset.type']);
+        $signature->load([
+            'acta.assignment.collaborator',
+            'acta.assignment.area',
+            'acta.assignment.assignmentAssets.asset.type',
+            'acta.generatedBy',
+            'acta.signatures',
+        ]);
 
         return view('sign.acta', compact('signature'));
     }
@@ -579,7 +584,8 @@ class ActaController extends Controller
 
         $acta->load([
             'assignment.collaborator',
-            'assignment.activeAssets.asset.type',
+            'assignment.area',
+            'assignment.assignmentAssets.asset.type',
             'generatedBy',
             'signatures',
         ]);
@@ -604,7 +610,8 @@ class ActaController extends Controller
 
         $acta->load([
             'assignment.collaborator',
-            'assignment.activeAssets.asset.type',
+            'assignment.area',
+            'assignment.assignmentAssets.asset.type',
             'generatedBy',
             'signatures',
         ]);

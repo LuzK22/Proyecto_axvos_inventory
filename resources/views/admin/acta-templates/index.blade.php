@@ -8,6 +8,10 @@
         'ALL' => 'Actas MIXTAS',
         default => 'Todas',
     };
+$categoryLabel = fn ($category) => match(strtoupper((string) $category)) {
+    'ALL' => 'MIXTA',
+    default => strtoupper((string) $category),
+};
 @endphp
 
 @section('title', 'Plantillas Excel de Actas')
@@ -67,7 +71,7 @@
                 <tr>
                     <td class="font-weight-bold">{{ $t->name }}</td>
                     <td><span class="badge badge-secondary">{{ $t->acta_type }}</span></td>
-                    <td><span class="badge badge-info">{{ $t->asset_category }}</span></td>
+                    <td><span class="badge badge-info">{{ $categoryLabel($t->asset_category) }}</span></td>
                     <td>
                         @if($t->active)
                             <span class="badge badge-success">Sí</span>
