@@ -333,6 +333,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/{acta}/excel/draft',         [ActaController::class, 'downloadExcelDraft'])->name('excel.draft.download');
         Route::post('/{acta}/excel/final',        [ActaController::class, 'uploadExcelFinal'])->name('excel.final.upload');
         Route::get('/{acta}/excel/final',         [ActaController::class, 'downloadExcelFinal'])->name('excel.final.download');
+        Route::post('/{acta}/fields',             [ActaController::class, 'updateWebFields'])->name('fields.update');
         Route::post('/{acta}/pdf/final',          [ActaController::class, 'generatePdfFinal'])->name('pdf.final.generate');
         Route::post('/{acta}/send',               [ActaController::class, 'send'])        ->name('send');
         Route::post('/{acta}/sign',               [ActaController::class, 'signInternal'])->name('sign.internal');
@@ -429,8 +430,30 @@ Route::middleware(['auth'])->group(function () {
         // Plantillas Excel de Actas (configurable por instalación)
         Route::get('/acta-templates', [ActaExcelTemplateController::class, 'index'])
             ->name('acta-templates.index');
+        Route::get('/acta-templates/ti', [ActaExcelTemplateController::class, 'index'])
+            ->defaults('category', 'TI')
+            ->name('acta-templates.ti');
+        Route::get('/acta-templates/otro', [ActaExcelTemplateController::class, 'index'])
+            ->defaults('category', 'OTRO')
+            ->name('acta-templates.otro');
+        Route::get('/acta-templates/mixta', [ActaExcelTemplateController::class, 'index'])
+            ->defaults('category', 'ALL')
+            ->name('acta-templates.mixta');
+        Route::get('/acta-templates/category/{category}', [ActaExcelTemplateController::class, 'index'])
+            ->name('acta-templates.category');
         Route::get('/acta-templates/create', [ActaExcelTemplateController::class, 'create'])
             ->name('acta-templates.create');
+        Route::get('/acta-templates/create/ti', [ActaExcelTemplateController::class, 'create'])
+            ->defaults('category', 'TI')
+            ->name('acta-templates.create.ti');
+        Route::get('/acta-templates/create/otro', [ActaExcelTemplateController::class, 'create'])
+            ->defaults('category', 'OTRO')
+            ->name('acta-templates.create.otro');
+        Route::get('/acta-templates/create/mixta', [ActaExcelTemplateController::class, 'create'])
+            ->defaults('category', 'ALL')
+            ->name('acta-templates.create.mixta');
+        Route::get('/acta-templates/create/{category}', [ActaExcelTemplateController::class, 'create'])
+            ->name('acta-templates.create.category');
         Route::post('/acta-templates', [ActaExcelTemplateController::class, 'store'])
             ->name('acta-templates.store');
         Route::get('/acta-templates/{actaExcelTemplate}/edit', [ActaExcelTemplateController::class, 'edit'])
