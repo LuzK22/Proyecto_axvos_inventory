@@ -7,7 +7,7 @@
         <h1 class="m-0">
             <i class="fas fa-upload text-success mr-2"></i> Subir Plantilla Excel
         </h1>
-        <a href="{{ route('admin.acta-templates.index') }}" class="btn btn-secondary btn-sm">
+        <a href="{{ route('admin.acta-templates.category', ['category' => strtolower($selectedCategory ?? 'ti')]) }}" class="btn btn-secondary btn-sm">
             <i class="fas fa-arrow-left mr-1"></i> Volver
         </a>
     </div>
@@ -45,13 +45,13 @@
                 <div class="col-md-4">
                     <div class="form-group">
                         <label class="font-weight-bold">Categoría <span class="text-danger">*</span></label>
-                        @php($cat = old('asset_category','TI'))
+                        @php($cat = old('asset_category', $selectedCategory ?? 'TI'))
                         <select name="asset_category" class="form-control" required>
                             <option value="TI"   {{ $cat==='TI' ? 'selected' : '' }}>TI</option>
                             <option value="OTRO" {{ $cat==='OTRO' ? 'selected' : '' }}>OTRO</option>
-                            <option value="ALL"  {{ $cat==='ALL' ? 'selected' : '' }}>ALL (fallback)</option>
+                            <option value="ALL"  {{ $cat==='ALL' ? 'selected' : '' }}>ALL (Mixta)</option>
                         </select>
-                        <small class="text-muted">ALL se usa como plantilla genérica si no hay una específica.</small>
+                        <small class="text-muted">Usa ALL para acta mixta; TI y OTRO quedan totalmente separadas.</small>
                     </div>
                 </div>
                 <div class="col-md-4">
@@ -77,4 +77,3 @@
 </div>
 
 @stop
-

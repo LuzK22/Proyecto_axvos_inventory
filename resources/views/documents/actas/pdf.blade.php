@@ -166,13 +166,14 @@
 
     {{-- ── Activos (filtrados por categoría del acta) ── --}}
     @php
-        $category  = $acta->asset_category ?? 'TI';
-        $catLabel  = $category === 'OTRO' ? 'Otros Activos' : 'Activos TI';
-        $assets    = $acta->assignment->assignmentAssets()
-                        ->whereNull('returned_at')
-                        ->whereHas('asset.type', fn($q) => $q->where('category', $category))
-                        ->with('asset.type')
-                        ->get();
+        $category  = strtoupper($acta->asset_category ?? 'TI');
+        $catLabel  = match($category) {
+            'OTRO' => 'Otros Activos',
+            'ALL'  => 'Activos Mixtos',
+            default => 'Activos TI',
+        };
+        $assets    = $acta->scopedAssignmentAssets();
+        $showTechColumns = $assets->contains(fn($aa) => strtoupper($aa->asset?->type?->category ?? '') === 'TI');
     @endphp
     <div class="section">
         <div class="section-title">{{ $catLabel }} Entregados</div>
@@ -185,6 +186,10 @@
                     <th>Marca</th>
                     <th>Modelo</th>
                     <th>Serial</th>
+                    @if($showTechColumns)
+                        <th>Etiqueta Inventario</th>
+                        <th>Activo Fijo</th>
+                    @endif
                     <th>Observaciones</th>
                 </tr>
             </thead>
@@ -197,10 +202,14 @@
                     <td>{{ $aa->asset->brand ?? '—' }}</td>
                     <td>{{ $aa->asset->model ?? '—' }}</td>
                     <td>{{ $aa->asset->serial ?? '—' }}</td>
+                    @if($showTechColumns)
+                        <td>{{ $aa->asset->asset_tag ?? '—' }}</td>
+                        <td>{{ $aa->asset->fixed_asset_code ?? '—' }}</td>
+                    @endif
                     <td></td>
                 </tr>
                 @empty
-                <tr><td colspan="7" style="text-align:center;color:#9ca3af;">Sin activos</td></tr>
+                <tr><td colspan="{{ $showTechColumns ? 9 : 7 }}" style="text-align:center;color:#9ca3af;">Sin activos</td></tr>
                 @endforelse
             </tbody>
         </table>
