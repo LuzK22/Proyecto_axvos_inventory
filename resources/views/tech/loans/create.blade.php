@@ -7,7 +7,7 @@
         <h1 class="m-0 text-dark"><i class="fas fa-plus-circle mr-2 text-primary"></i>Nuevo Préstamo TI</h1>
         <small class="text-muted">Registra un préstamo temporal de un activo tecnológico</small>
     </div>
-    <a href="{{ route('tech.loans.index') }}" class="btn btn-sm btn-secondary">
+    <a href="{{ route('tech.loans.hub') }}" class="btn btn-sm btn-secondary">
         <i class="fas fa-arrow-left mr-1"></i> Volver
     </a>
 </div>
@@ -56,7 +56,7 @@
                     <option value="">— Seleccionar colaborador —</option>
                     @foreach($collaborators as $c)
                     <option value="{{ $c->id }}" {{ old('collaborator_id')==$c->id?'selected':'' }}>
-                        {{ $c->full_name }}@if($c->position) — {{ $c->position }}@endif@if($c->branch) ({{ $c->branch->name }})@endif
+                        {{ $c->full_name }}{{ $c->position ? ' — '.$c->position : '' }}{{ $c->branch ? ' ('.$c->branch->name.')' : '' }}
                     </option>
                     @endforeach
                 </select>

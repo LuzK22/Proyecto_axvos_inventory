@@ -23,8 +23,8 @@ class CollaboratorController extends Controller
         if ($request->filled('search')) {
             $s = $request->search;
             $query->where(function ($q) use ($s) {
+                // document is encrypted — cannot use LIKE; search by full_name, email, area only
                 $q->where('full_name', 'like', "%{$s}%")
-                  ->orWhere('document',  'like', "%{$s}%")
                   ->orWhere('email',     'like', "%{$s}%")
                   ->orWhere('area',      'like', "%{$s}%");
             });

@@ -4,6 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\Asset;
 use App\Models\AssetEvent;
+use App\Models\AssetType;
+use App\Models\Branch;
+use App\Models\Collaborator;
 use App\Models\DeletionRequest;
 use App\Models\Status;
 use Illuminate\Http\Request;
@@ -11,6 +14,72 @@ use Illuminate\Support\Facades\DB;
 
 class DeletionRequestController extends Controller
 {
+    /*
+    |--------------------------------------------------------------------------
+    | VISTAS TECH: listado y formulario de solicitudes para usuarios TI / OTRO
+    |--------------------------------------------------------------------------
+    */
+
+    /** Listado de solicitudes TI visible para el rol técnico */
+    public function techIndex(Request $request)
+    {
+        return $this->disposalIndex($request, 'TI', 'tech.disposals.index');
+    }
+
+    /** Formulario nueva solicitud TI */
+    public function techCreate()
+    {
+        $assets   = Asset::with(['type','status','branch'])
+            ->whereHas('type', fn($q) => $q->where('category', 'TI'))
+            ->whereDoesntHave('deletionRequests', fn($q) => $q->where('status', 'pending'))
+            ->whereHas('status', fn($q) => $q->where('name', '!=', 'Baja'))
+            ->orderBy('internal_code')
+            ->get();
+        $branches = Branch::where('active', true)->orderBy('name')->get();
+
+        return view('tech.disposals.create', compact('assets', 'branches'));
+    }
+
+    /** Listado de solicitudes OTRO visible para el rol de activos */
+    public function assetsIndex(Request $request)
+    {
+        return $this->disposalIndex($request, 'OTRO', 'assets.disposals.index');
+    }
+
+    /** Formulario nueva solicitud OTRO */
+    public function assetsCreate()
+    {
+        $assets   = Asset::with(['type','status','branch'])
+            ->whereHas('type', fn($q) => $q->where('category', 'OTRO'))
+            ->whereDoesntHave('deletionRequests', fn($q) => $q->where('status', 'pending'))
+            ->whereHas('status', fn($q) => $q->where('name', '!=', 'Baja'))
+            ->orderBy('internal_code')
+            ->get();
+        $branches = Branch::where('active', true)->orderBy('name')->get();
+
+        return view('assets.disposals.create', compact('assets', 'branches'));
+    }
+
+    /** Helper compartido para los índices de solicitudes por categoría */
+    private function disposalIndex(Request $request, string $category, string $selfRoute)
+    {
+        $filter = $request->get('filter', 'pending');
+
+        $query = DeletionRequest::with(['asset.type','asset.branch','requestedBy','resolvedBy'])
+            ->whereHas('asset.type', fn($q) => $q->where('category', $category))
+            ->latest();
+
+        if ($filter !== 'all') {
+            $query->where('status', $filter);
+        }
+
+        $requests     = $query->paginate(20)->withQueryString();
+        $pendingCount = DeletionRequest::whereHas('asset.type', fn($q) => $q->where('category', $category))
+            ->where('status', 'pending')->count();
+
+        return view('tech.disposals.index', compact('requests', 'filter', 'pendingCount', 'category', 'selfRoute'));
+    }
+
     /*
     |--------------------------------------------------------------------------
     | SOLICITAR ELIMINACIÓN (cualquier usuario con permiso de asignación)
@@ -78,6 +147,15 @@ class DeletionRequestController extends Controller
         // No procesamos solicitudes que ya fueron resueltas
         if ($deletionRequest->status !== DeletionRequest::STATUS_PENDING) {
             return back()->with('error', 'Esta solicitud ya fue procesada.');
+        }
+
+        // Bloquear aprobación si el activo está actualmente asignado
+        $deletionRequest->load('asset.status');
+        if ($deletionRequest->asset->status?->name === 'Asignado') {
+            return back()->with('error',
+                "No se puede aprobar la baja: el activo <strong>{$deletionRequest->asset->internal_code}</strong> ".
+                "está asignado actualmente. Primero retírelo de la asignación activa."
+            );
         }
 
         DB::transaction(function () use ($deletionRequest) {

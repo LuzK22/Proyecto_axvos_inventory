@@ -177,12 +177,15 @@ class Acta extends Model
             'ALL'  => 'MX',
             default => 'TI',
         };
-        $prefix    = self::typePrefix($type);
-        $count     = self::whereYear('created_at', $year)
-                         ->where('asset_category', $category)
-                         ->where('acta_type', $type)
-                         ->count();
-        $seq = str_pad($count + 1, 4, '0', STR_PAD_LEFT);
+        $prefix  = self::typePrefix($type);
+        $pattern = "ACT-{$catPrefix}-{$prefix}-{$year}-%";
+        $lastSeq = self::whereYear('created_at', $year)
+                       ->where('acta_number', 'like', $pattern)
+                       ->lockForUpdate()
+                       ->max(\Illuminate\Support\Facades\DB::raw(
+                           'CAST(SUBSTRING_INDEX(acta_number, \'-\', -1) AS UNSIGNED)'
+                       ));
+        $seq = str_pad(($lastSeq ?? 0) + 1, 4, '0', STR_PAD_LEFT);
         return "ACT-{$catPrefix}-{$prefix}-{$year}-{$seq}";
     }
 

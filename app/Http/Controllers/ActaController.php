@@ -27,11 +27,17 @@ class ActaController extends Controller
      */
     public function index(Request $request)
     {
-        $filter = $request->get('filter', 'all');
+        $filter   = $request->get('filter', 'all');
+        $typeTab  = $request->get('type', 'all'); // entrega | devolucion | baja | all
+        $category = $request->get('category', null); // 'TI', 'OTRO', or null (all)
+        if (!in_array($category, ['TI', 'OTRO'])) {
+            $category = null;
+        }
 
         $query = Acta::with(['assignment.collaborator', 'generatedBy', 'signatures'])
             ->latest();
 
+        // Filtro por estado
         if ($filter === 'pending') {
             $query->whereNotIn('status', [Acta::STATUS_COMPLETADA, Acta::STATUS_ANULADA]);
         } elseif ($filter === 'signed') {
@@ -40,9 +46,27 @@ class ActaController extends Controller
             $query->where('status', Acta::STATUS_BORRADOR);
         }
 
+        // Filtro por tipo de acta
+        if (in_array($typeTab, [Acta::TYPE_ENTREGA, Acta::TYPE_DEVOLUCION, Acta::TYPE_BAJA])) {
+            $query->where('acta_type', $typeTab);
+        }
+
+        // Filtro por categoría de activo
+        if ($category !== null) {
+            $query->where('asset_category', $category);
+        }
+
         $actas = $query->paginate(20)->withQueryString();
 
-        return view('documents.actas.index', compact('actas', 'filter'));
+        // Conteos por tipo para los tabs (filtrados por categoría si aplica)
+        $counts = [
+            'all'                 => Acta::when($category, fn($q) => $q->where('asset_category', $category))->count(),
+            Acta::TYPE_ENTREGA    => Acta::where('acta_type', Acta::TYPE_ENTREGA)->when($category, fn($q) => $q->where('asset_category', $category))->count(),
+            Acta::TYPE_DEVOLUCION => Acta::where('acta_type', Acta::TYPE_DEVOLUCION)->when($category, fn($q) => $q->where('asset_category', $category))->count(),
+            Acta::TYPE_BAJA       => Acta::where('acta_type', Acta::TYPE_BAJA)->when($category, fn($q) => $q->where('asset_category', $category))->count(),
+        ];
+
+        return view('documents.actas.index', compact('actas', 'filter', 'typeTab', 'counts', 'category'));
     }
 
     /**

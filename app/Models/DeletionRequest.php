@@ -3,9 +3,22 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 class DeletionRequest extends Model
 {
+    use LogsActivity;
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly(['status', 'resolved_by', 'rejection_notes'])
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->setDescriptionForEvent(fn(string $eventName) => "Solicitud de baja {$eventName}");
+    }
+
     protected $fillable = [
         'asset_id', 'requested_by', 'resolved_by',
         'status', 'reason', 'notes', 'rejection_notes', 'resolved_at',

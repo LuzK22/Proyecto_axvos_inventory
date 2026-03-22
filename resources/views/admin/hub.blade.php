@@ -121,13 +121,18 @@
             </div>
             @endcan
 
+            @can('users.manage')
             <div class="col-md-4 mb-3">
-                <div class="hub-btn hub-btn-soon">
+                <a href="{{ route('admin.permissions.index') }}" class="hub-btn"
+                   style="background:linear-gradient(135deg,#7c3aed,#6d28d9);">
                     <div class="hub-btn-icon"><i class="fas fa-key"></i></div>
-                    <div class="hub-btn-text"><strong>Permisos</strong><small>Gestión avanzada de roles</small></div>
-                    <span class="hub-soon-badge">Próximamente</span>
-                </div>
+                    <div class="hub-btn-text">
+                        <strong>Permisos</strong>
+                        <small>Matriz de permisos por rol</small>
+                    </div>
+                </a>
             </div>
+            @endcan
 
         </div>
     </div>

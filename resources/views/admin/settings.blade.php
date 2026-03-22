@@ -127,6 +127,27 @@
             </div>
         </div>
 
+        {{-- ■ Usuarios ─────────────────────────────────────────────────── --}}
+        <div class="card card-outline shadow-sm mb-4" style="border-top-color:#6f42c1;" id="usuarios">
+            <div class="card-header" style="background:#f8f9fa;">
+                <h3 class="card-title font-weight-bold">
+                    <i class="fas fa-users mr-2" style="color:#6f42c1;"></i> Usuarios
+                </h3>
+            </div>
+            <div class="card-body">
+                <div class="form-group mb-0">
+                    <label class="font-weight-bold">Dominios de correo permitidos</label>
+                    <input type="text" name="user_email_domains" class="form-control"
+                           value="{{ old('user_email_domains', $settings['user_email_domains']->value ?? 'axvos.local') }}"
+                           placeholder="axvos.local,miempresa.com">
+                    <small class="text-muted">
+                        Dominios disponibles al crear usuarios. Separar con comas.
+                        Ej: <code>axvos.local,miempresa.com</code>
+                    </small>
+                </div>
+            </div>
+        </div>
+
         {{-- ■ Plantillas de Actas ───────────────────────────────────────── --}}
         <div class="card card-outline shadow-sm mb-4" style="border-top-color:#28a745;" id="actas">
             <div class="card-header" style="background:#f8f9fa;">
@@ -174,6 +195,123 @@
                               placeholder="Texto al final del acta. Ej: cláusulas de responsabilidad, firma del colaborador..."
                               >{{ old('acta_footer_text', $settings['acta_footer_text']->value ?? '') }}</textarea>
                 </div>
+            </div>
+        </div>
+
+        {{-- ■ Seguridad 2FA ─────────────────────────────────────────────── --}}
+        <div class="card card-outline shadow-sm mb-4" style="border-top-color:#dc3545;" id="seguridad">
+            <div class="card-header" style="background:#f8f9fa;">
+                <h3 class="card-title font-weight-bold">
+                    <i class="fas fa-shield-alt mr-2" style="color:#dc3545;"></i> Seguridad — Autenticación de Dos Factores (2FA)
+                </h3>
+            </div>
+            <div class="card-body">
+
+                {{-- Toggle global --}}
+                <div class="form-group">
+                    <div class="custom-control custom-switch">
+                        <input type="checkbox" class="custom-control-input" id="security_2fa_enabled"
+                               name="security_2fa_enabled" value="1"
+                               {{ old('security_2fa_enabled', $settings['security_2fa_enabled']->value ?? '1') === '1' ? 'checked' : '' }}>
+                        <label class="custom-control-label font-weight-bold" for="security_2fa_enabled">
+                            Habilitar autenticación de dos factores (2FA)
+                        </label>
+                    </div>
+                    <small class="text-muted d-block mt-1">
+                        Al desactivar, <strong>ningún rol</strong> requerirá 2FA independientemente de la configuración inferior.
+                    </small>
+                </div>
+
+                <hr>
+
+                {{-- Roles que requieren 2FA --}}
+                <div class="form-group">
+                    <label class="font-weight-bold">Roles que requieren 2FA</label>
+                    <small class="text-muted d-block mb-2">
+                        Los usuarios de estos roles serán redirigidos a configurar o verificar 2FA al iniciar sesión.
+                    </small>
+                    @php
+                        $currentRoles = array_map('trim', explode(',', $settings['security_2fa_required_roles']->value ?? 'Admin,Aprobador'));
+                        $oldRoles     = old('security_2fa_required_roles', $currentRoles);
+                    @endphp
+                    <div class="row">
+                        @foreach($roles as $role)
+                            <div class="col-sm-6 col-md-4">
+                                <div class="custom-control custom-checkbox mb-1">
+                                    <input type="checkbox"
+                                           class="custom-control-input"
+                                           id="role_{{ $role }}"
+                                           name="security_2fa_required_roles[]"
+                                           value="{{ $role }}"
+                                           {{ in_array($role, (array)$oldRoles) ? 'checked' : '' }}>
+                                    <label class="custom-control-label" for="role_{{ $role }}">
+                                        {{ $role }}
+                                    </label>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                    @error('security_2fa_required_roles')
+                        <div class="text-danger small mt-1">{{ $message }}</div>
+                    @enderror
+                </div>
+
+                <hr>
+
+                {{-- Modo de aplicación --}}
+                <div class="form-group">
+                    <label class="font-weight-bold">Modo de aplicación</label>
+                    @php $enforcement = old('security_2fa_enforcement', $settings['security_2fa_enforcement']->value ?? 'required'); @endphp
+                    <div class="row mt-1">
+                        <div class="col-sm-6">
+                            <div class="custom-control custom-radio">
+                                <input type="radio" class="custom-control-input" id="enforce_required"
+                                       name="security_2fa_enforcement" value="required"
+                                       {{ $enforcement === 'required' ? 'checked' : '' }}>
+                                <label class="custom-control-label" for="enforce_required">
+                                    <strong>Obligatorio</strong>
+                                    <small class="d-block text-muted">Bloquea acceso si no verifica 2FA</small>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-sm-6">
+                            <div class="custom-control custom-radio">
+                                <input type="radio" class="custom-control-input" id="enforce_recommended"
+                                       name="security_2fa_enforcement" value="recommended"
+                                       {{ $enforcement === 'recommended' ? 'checked' : '' }}>
+                                <label class="custom-control-label" for="enforce_recommended">
+                                    <strong>Recomendado</strong>
+                                    <small class="d-block text-muted">Muestra aviso pero permite el acceso</small>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <hr>
+
+                {{-- Días de gracia --}}
+                <div class="form-group mb-0">
+                    <label class="font-weight-bold">Días de gracia para configurar 2FA</label>
+                    <div class="input-group" style="max-width:200px;">
+                        <input type="number"
+                               name="security_2fa_grace_days"
+                               class="form-control @error('security_2fa_grace_days') is-invalid @enderror"
+                               min="0" max="365"
+                               value="{{ old('security_2fa_grace_days', $settings['security_2fa_grace_days']->value ?? '0') }}">
+                        <div class="input-group-append">
+                            <span class="input-group-text">días</span>
+                        </div>
+                        @error('security_2fa_grace_days')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                        @enderror
+                    </div>
+                    <small class="text-muted">
+                        Número de días desde la creación de la cuenta antes de exigir 2FA.
+                        <strong>0</strong> = obligatorio desde el primer inicio de sesión.
+                    </small>
+                </div>
+
             </div>
         </div>
 
@@ -237,11 +375,17 @@
                 <a href="#sistema" class="list-group-item list-group-item-action">
                     <i class="fas fa-sliders-h mr-2" style="color:#3a57e8;"></i> Sistema
                 </a>
+                <a href="#usuarios" class="list-group-item list-group-item-action">
+                    <i class="fas fa-users mr-2" style="color:#6f42c1;"></i> Usuarios
+                </a>
                 <a href="#actas" class="list-group-item list-group-item-action">
                     <i class="fas fa-file-signature mr-2 text-success"></i> Plantillas de actas
                 </a>
                 <a href="#logo" class="list-group-item list-group-item-action">
                     <i class="fas fa-image mr-2" style="color:#fd7e14;"></i> Logo
+                </a>
+                <a href="#seguridad" class="list-group-item list-group-item-action">
+                    <i class="fas fa-shield-alt mr-2 text-danger"></i> Seguridad 2FA
                 </a>
             </div>
         </div>

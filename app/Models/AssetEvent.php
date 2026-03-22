@@ -31,6 +31,8 @@ class AssetEvent extends Model
         'venta'          => 'Venta',
         'actualizacion'  => 'Actualización',
         'disponible'     => 'Disponible',
+        'creacion'       => 'Registro de Activo',
+        'prestamo'       => 'Préstamo',
     ];
 
     public function getEventLabelAttribute(): string
@@ -50,6 +52,8 @@ class AssetEvent extends Model
             'donacion'      => 'dark',
             'venta'         => 'dark',
             'disponible'    => 'success',
+            'creacion'      => 'success',
+            'prestamo'      => 'primary',
             default         => 'secondary',
         };
     }
@@ -84,6 +88,26 @@ class AssetEvent extends Model
     public function toBranch()
     {
         return $this->belongsTo(Branch::class, 'to_branch_id');
+    }
+
+    // ─── Inmutabilidad: los eventos del historial no se pueden modificar ──
+
+    public function save(array $options = []): bool
+    {
+        if ($this->exists) {
+            throw new \RuntimeException('AssetEvent records are immutable and cannot be updated.');
+        }
+        return parent::save($options);
+    }
+
+    public function update(array $attributes = [], array $options = []): bool
+    {
+        throw new \RuntimeException('AssetEvent records are immutable and cannot be updated.');
+    }
+
+    public function delete(): ?bool
+    {
+        throw new \RuntimeException('AssetEvent records are immutable and cannot be deleted.');
     }
 
     // ─── Helper estático para registrar evento ─────────────────

@@ -22,7 +22,13 @@ use App\Http\Controllers\AreaController;
 use App\Http\Controllers\ActaExcelTemplateController;
 use App\Http\Controllers\ActaExcelTemplateFieldController;
 use App\Http\Controllers\LoanController;
+use App\Http\Controllers\OtroLoanController;
 use App\Http\Controllers\AxiController;
+use App\Http\Controllers\StatusController;
+use App\Http\Controllers\CategoriesController;
+use App\Http\Controllers\PermissionController;
+use App\Http\Controllers\TwoFactorController;
+use App\Http\Controllers\SecurityController;
 
 /*
 |--------------------------------------------------------------------------
@@ -50,10 +56,35 @@ require __DIR__ . '/auth.php';
 
 /*
 |--------------------------------------------------------------------------
+| AUTENTICACIÓN DE DOS FACTORES (2FA)
+|--------------------------------------------------------------------------
+*/
+Route::middleware('auth')->prefix('2fa')->name('2fa.')->group(function () {
+    Route::get('/setup',   [TwoFactorController::class, 'setup'])        ->name('setup');
+    Route::post('/setup',  [TwoFactorController::class, 'confirm'])      ->name('confirm')       ->middleware('throttle:10,1');
+    Route::get('/verify',  [TwoFactorController::class, 'verify'])       ->name('verify');
+    Route::post('/verify', [TwoFactorController::class, 'validateCode']) ->name('validate')      ->middleware('throttle:10,1');
+    Route::post('/disable',[TwoFactorController::class, 'disable'])      ->name('disable')       ->middleware('throttle:5,1');
+});
+
+/*
+|--------------------------------------------------------------------------
+| CENTRO DE SEGURIDAD
+|--------------------------------------------------------------------------
+*/
+Route::middleware(['auth', 'require.2fa'])->prefix('security')->name('security.')->group(function () {
+    Route::get('/',                      [SecurityController::class, 'index'])                  ->name('index');
+    Route::delete('/sessions/{id}',      [SecurityController::class, 'revokeSession'])          ->name('sessions.revoke');
+    Route::post('/sessions/revoke-all',  [SecurityController::class, 'revokeAllOtherSessions']) ->name('sessions.revoke-all');
+    Route::post('/2fa/recovery-codes',   [SecurityController::class, 'regenerateRecoveryCodes'])->name('2fa.recovery-codes');
+});
+
+/*
+|--------------------------------------------------------------------------
 | RUTAS PROTEGIDAS
 |--------------------------------------------------------------------------
 */
-Route::middleware(['auth'])->group(function () {
+Route::middleware(['auth', 'require.2fa'])->group(function () {
 
     /*
     |--------------------------------------------------------------------------
@@ -184,6 +215,14 @@ Route::middleware(['auth'])->group(function () {
                 ->name('disposals.hub')
                 ->middleware('can:tech.assets.disposal.view');
 
+            Route::get('/disposals',        [DeletionRequestController::class, 'techIndex'])
+                ->name('disposals.index')
+                ->middleware('can:tech.assets.disposal.view');
+
+            Route::get('/disposals/create', [DeletionRequestController::class, 'techCreate'])
+                ->name('disposals.create')
+                ->middleware('can:tech.assets.disposal.request');
+
             Route::get('/reports/hub', [ReportController::class, 'tech'])
                 ->name('reports.hub')
                 ->middleware('can:tech.reports.view');
@@ -253,11 +292,6 @@ Route::middleware(['auth'])->group(function () {
                 ->name('history.index')
                 ->middleware('can:tech.history.view');
 
-            // ── BAJAS TI ───────────────────────────────────────────────
-            Route::get('/disposals', [AssetController::class, 'disposals'])
-                ->name('disposals.index')
-                ->middleware('can:tech.assets.disposal.view');
-
             // ======================
             // REPORTES TI
             // ======================
@@ -283,6 +317,8 @@ Route::middleware(['auth'])->group(function () {
             Route::get('/hub',              fn() => view('assets.hub'))               ->name('hub')              ->middleware('can:assets.view');
             Route::get('/assignments/hub',  fn() => view('assets.assignments.hub'))   ->name('assignments.hub')  ->middleware('can:assets.assign');
             Route::get('/disposals/hub',    fn() => view('assets.disposals.hub'))     ->name('disposals.hub')    ->middleware('can:assets.disposal.view');
+            Route::get('/disposals',        [DeletionRequestController::class, 'assetsIndex'])  ->name('disposals.index')  ->middleware('can:assets.disposal.view');
+            Route::get('/disposals/create', [DeletionRequestController::class, 'assetsCreate']) ->name('disposals.create') ->middleware('can:assets.disposal.request');
             Route::get('/reports/hub',      [ReportController::class, 'assets'])        ->name('reports.hub')      ->middleware('can:assets.reports.view');
 
             // ── INVENTARIO DE OTROS ACTIVOS — CRUD ────────────────────────────
@@ -309,14 +345,20 @@ Route::middleware(['auth'])->group(function () {
                 Route::post('/assignments/{assignment}/return',     [OtroAssetAssignmentController::class, 'processReturn'])->name('assignments.return.process');
             });
 
+            // ── PRÉSTAMOS OTROS ACTIVOS ───────────────────────────────────────────
+            Route::get('/loans/hub',           fn() => view('assets.loans.hub'))                            ->name('loans.hub')          ->middleware('can:assets.view');
+            Route::get('/loans',               [OtroLoanController::class, 'index'])                        ->name('loans.index')        ->middleware('can:assets.view');
+            Route::get('/loans/export',        [OtroLoanController::class, 'export'])                       ->name('loans.export')       ->middleware('can:assets.view');
+            Route::get('/loans/create',        [OtroLoanController::class, 'create'])                       ->name('loans.create')       ->middleware('can:assets.assign');
+            Route::post('/loans',              [OtroLoanController::class, 'store'])                        ->name('loans.store')        ->middleware('can:assets.assign');
+            Route::get('/loans/{loan}',        [OtroLoanController::class, 'show'])                         ->name('loans.show')         ->middleware('can:assets.view');
+            Route::get('/loans/{loan}/return', [OtroLoanController::class, 'returnForm'])                   ->name('loans.return')       ->middleware('can:assets.assign');
+            Route::post('/loans/{loan}/return',[OtroLoanController::class, 'processReturn'])                ->name('loans.return.store') ->middleware('can:assets.assign');
+
             // ── HISTORIAL, BAJAS Y REPORTES ────────────────────────────────────
             Route::get('/history', [AssetController::class, 'assetsHistory'])
                 ->name('history.index')
                 ->middleware('can:assets.history.view');
-
-            Route::get('/disposals', [AssetController::class, 'assetsDisposals'])
-                ->name('disposals.index')
-                ->middleware('can:assets.disposal.view');
 
             Route::get('/reports', [ReportController::class, 'assets'])
                 ->name('reports.index')
@@ -342,6 +384,8 @@ Route::middleware(['auth'])->group(function () {
     |--------------------------------------------------------------------------
     */
     Route::get('/admin/hub',       fn() => view('admin.hub'))       ->name('admin.hub')       ->middleware('can:users.manage');
+    Route::get('/admin/permissions',  [PermissionController::class, 'index'])  ->name('admin.permissions.index')  ->middleware('can:users.manage');
+    Route::post('/admin/permissions', [PermissionController::class, 'update']) ->name('admin.permissions.update') ->middleware('can:users.manage');
     Route::get('/audit/hub',  [AuditController::class, 'hub'])    ->name('audit.hub')    ->middleware('can:audit.view');
     Route::get('/audit/export', [AuditController::class, 'export'])->name('audit.export')->middleware('can:audit.export');
     Route::get('/documents/hub',   fn() => view('documents.hub'))   ->name('documents.hub')   ->middleware('auth');
@@ -390,7 +434,7 @@ Route::middleware(['auth'])->group(function () {
     // Gestión de solicitudes (solo Aprobador)
     Route::prefix('admin/deletion-requests')
         ->name('deletion-requests.')
-        ->middleware('can:assets.approve.deletion')
+        ->middleware(['can:assets.approve.deletion', 'throttle:30,1'])
         ->group(function () {
             Route::get('/',                                    [DeletionRequestController::class, 'index'])   ->name('index');
             Route::post('/{deletionRequest}/approve',          [DeletionRequestController::class, 'approve']) ->name('approve');
@@ -404,16 +448,21 @@ Route::middleware(['auth'])->group(function () {
     */
     Route::prefix('assets/{asset}/transition')
         ->name('asset.transition.')
-        ->middleware('can:tech.assets.assign')
         ->group(function () {
-            Route::post('/retire',          [AssetTransitionController::class, 'retire'])          ->name('retire');
-            Route::post('/maintenance',     [AssetTransitionController::class, 'toMaintenance'])   ->name('maintenance');
-            Route::post('/warranty',        [AssetTransitionController::class, 'toWarranty'])      ->name('warranty');
-            Route::post('/transfer',        [AssetTransitionController::class, 'transfer'])        ->name('transfer');
-            Route::post('/arrival',         [AssetTransitionController::class, 'arrivalConfirm'])  ->name('arrival');
-            Route::post('/baja',            [AssetTransitionController::class, 'toBaja'])          ->name('baja');
-            Route::post('/donation',        [AssetTransitionController::class, 'toDonation'])      ->name('donation');
-            Route::post('/sale',            [AssetTransitionController::class, 'toSale'])          ->name('sale');
+            // Movimientos operativos — requieren permiso de asignación
+            Route::middleware('can:tech.assets.assign')->group(function () {
+                Route::post('/retire',      [AssetTransitionController::class, 'retire'])         ->name('retire');
+                Route::post('/maintenance', [AssetTransitionController::class, 'toMaintenance'])  ->name('maintenance');
+                Route::post('/warranty',    [AssetTransitionController::class, 'toWarranty'])     ->name('warranty');
+                Route::post('/transfer',    [AssetTransitionController::class, 'transfer'])       ->name('transfer');
+                Route::post('/arrival',     [AssetTransitionController::class, 'arrivalConfirm']) ->name('arrival');
+            });
+            // Desincorporaciones — requieren permiso de solicitud de baja
+            Route::middleware('can:tech.assets.disposal.request')->group(function () {
+                Route::post('/baja',     [AssetTransitionController::class, 'toBaja'])     ->name('baja');
+                Route::post('/donation', [AssetTransitionController::class, 'toDonation']) ->name('donation');
+                Route::post('/sale',     [AssetTransitionController::class, 'toSale'])     ->name('sale');
+            });
         });
 
     /*
@@ -421,13 +470,31 @@ Route::middleware(['auth'])->group(function () {
     | ADMINISTRACIÓN — USUARIOS
     |--------------------------------------------------------------------------
     */
-    Route::middleware('can:users.manage')->group(function () {
+    Route::middleware(['can:users.manage', 'throttle:40,1'])->group(function () {
 
         Route::get('/admin/users', [UserController::class, 'index'])
             ->name('users.index');
 
         Route::get('/admin/users/create', [UserController::class, 'create'])
             ->name('users.create');
+
+        Route::post('/admin/users', [UserController::class, 'store'])
+            ->name('users.store');
+
+        Route::get('/admin/users/{user}/edit', [UserController::class, 'edit'])
+            ->name('users.edit');
+
+        Route::put('/admin/users/{user}', [UserController::class, 'update'])
+            ->name('users.update');
+
+        Route::delete('/admin/users/{user}', [UserController::class, 'destroy'])
+            ->name('users.destroy');
+
+        Route::post('/admin/users/{user}/revoke-sessions', [UserController::class, 'revokeAllSessions'])
+            ->name('users.revoke-sessions');
+
+        Route::post('/admin/users/{user}/unlock', [UserController::class, 'unlock'])
+            ->name('users.unlock');
     });
 
     /*
@@ -555,9 +622,17 @@ Route::middleware(['auth'])->group(function () {
     */
     Route::middleware('can:categories.manage')->group(function () {
 
-        Route::get('/categories', function () {
-            return 'Módulo Categorías (pendiente de desarrollo)';
-        })->name('categories.index');
+        Route::get('/categories', [CategoriesController::class, 'index'])
+            ->name('categories.index');
+
+        Route::post('/categories', [CategoriesController::class, 'store'])
+            ->name('categories.store');
+
+        Route::put('/categories/{id}', [CategoriesController::class, 'update'])
+            ->name('categories.update');
+
+        Route::delete('/categories/{id}', [CategoriesController::class, 'destroy'])
+            ->name('categories.destroy');
     });
 
     /*
@@ -567,9 +642,17 @@ Route::middleware(['auth'])->group(function () {
     */
     Route::middleware('can:statuses.manage')->group(function () {
 
-        Route::get('/statuses', function () {
-            return 'Módulo Estados (pendiente de desarrollo)';
-        })->name('statuses.index');
+        Route::get('/statuses', [StatusController::class, 'index'])
+            ->name('statuses.index');
+
+        Route::post('/statuses', [StatusController::class, 'store'])
+            ->name('statuses.store');
+
+        Route::put('/statuses/{status}', [StatusController::class, 'update'])
+            ->name('statuses.update');
+
+        Route::delete('/statuses/{status}', [StatusController::class, 'destroy'])
+            ->name('statuses.destroy');
     });
 
     /*

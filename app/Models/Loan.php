@@ -8,8 +8,11 @@ use Carbon\Carbon;
 class Loan extends Model
 {
     protected $fillable = [
+        'category',
         'asset_id',
         'collaborator_id',
+        'destination_type',
+        'destination_branch_id',
         'start_date',
         'end_date',       // fecha comprometida de devolución
         'returned_at',
@@ -46,6 +49,11 @@ class Loan extends Model
         return $this->belongsTo(User::class, 'returned_by');
     }
 
+    public function destinationBranch()
+    {
+        return $this->belongsTo(Branch::class, 'destination_branch_id');
+    }
+
     // ── Helpers ────────────────────────────────────────────────────────
 
     // Días restantes para la devolución (negativo = vencido)
@@ -79,5 +87,10 @@ class Loan extends Model
     {
         return $query->where('status', 'activo')
                      ->where('end_date', '<', now()->startOfDay());
+    }
+
+    public function scopeForCategory($query, string $cat)
+    {
+        return $query->where('category', $cat);
     }
 }

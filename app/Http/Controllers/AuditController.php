@@ -145,8 +145,7 @@ class AuditController extends Controller
         if ($r->filled('branch_id'))    $q->whereHas('collaborator',
             fn($sq) => $sq->where('branch_id', $r->branch_id));
         if ($r->filled('collaborator')) $q->whereHas('collaborator',
-            fn($sq) => $sq->where('full_name', 'like', "%{$r->collaborator}%")
-                          ->orWhere('document', 'like', "%{$r->collaborator}%"));
+            fn($sq) => $sq->where('full_name', 'like', "%{$r->collaborator}%"));
         return $q->orderByDesc('start_date')->paginate(self::PER_PAGE)->withQueryString();
     }
 
@@ -160,8 +159,7 @@ class AuditController extends Controller
         if ($r->filled('branch_id'))     $q->whereHas('collaborator',
             fn($sq) => $sq->where('branch_id', $r->branch_id));
         if ($r->filled('collaborator'))  $q->whereHas('collaborator',
-            fn($sq) => $sq->where('full_name', 'like', "%{$r->collaborator}%")
-                          ->orWhere('document', 'like', "%{$r->collaborator}%"));
+            fn($sq) => $sq->where('full_name', 'like', "%{$r->collaborator}%"));
         return $q->orderByDesc('assignment_date')->paginate(self::PER_PAGE)->withQueryString();
     }
 
@@ -179,8 +177,7 @@ class AuditController extends Controller
         if ($r->filled('branch_id'))    $q->whereHas('assignment.collaborator',
             fn($sq) => $sq->where('branch_id', $r->branch_id));
         if ($r->filled('collaborator')) $q->whereHas('assignment.collaborator',
-            fn($sq) => $sq->where('full_name', 'like', "%{$r->collaborator}%")
-                          ->orWhere('document', 'like', "%{$r->collaborator}%"));
+            fn($sq) => $sq->where('full_name', 'like', "%{$r->collaborator}%"));
         return $q->orderByDesc('updated_at')->paginate(self::PER_PAGE)->withQueryString();
     }
 
@@ -227,8 +224,7 @@ class AuditController extends Controller
         if ($r->filled('branch_id'))    $q->whereHas('collaborator',
             fn($sq) => $sq->where('branch_id', $r->branch_id));
         if ($r->filled('collaborator')) $q->whereHas('collaborator',
-            fn($sq) => $sq->where('full_name', 'like', "%{$r->collaborator}%")
-                          ->orWhere('document', 'like', "%{$r->collaborator}%"));
+            fn($sq) => $sq->where('full_name', 'like', "%{$r->collaborator}%"));
         $rows = $q->orderByDesc('start_date')->get()->map(fn($l) => [
             $l->id, $l->asset?->internal_code, $l->asset?->type?->name,
             $l->collaborator?->full_name, $l->collaborator?->document,
@@ -252,8 +248,7 @@ class AuditController extends Controller
         if ($r->filled('branch_id'))     $q->whereHas('collaborator',
             fn($sq) => $sq->where('branch_id', $r->branch_id));
         if ($r->filled('collaborator'))  $q->whereHas('collaborator',
-            fn($sq) => $sq->where('full_name', 'like', "%{$r->collaborator}%")
-                          ->orWhere('document', 'like', "%{$r->collaborator}%"));
+            fn($sq) => $sq->where('full_name', 'like', "%{$r->collaborator}%"));
         $rows = $q->orderByDesc('assignment_date')->get()->map(fn($a) => [
             $a->id, $a->collaborator?->full_name, $a->collaborator?->document,
             $a->collaborator?->branch?->name, $a->work_modality,
@@ -280,8 +275,7 @@ class AuditController extends Controller
         if ($r->filled('branch_id'))    $q->whereHas('assignment.collaborator',
             fn($sq) => $sq->where('branch_id', $r->branch_id));
         if ($r->filled('collaborator')) $q->whereHas('assignment.collaborator',
-            fn($sq) => $sq->where('full_name', 'like', "%{$r->collaborator}%")
-                          ->orWhere('document', 'like', "%{$r->collaborator}%"));
+            fn($sq) => $sq->where('full_name', 'like', "%{$r->collaborator}%"));
         $rows = $q->orderByDesc('updated_at')->get()->map(fn($aa) => [
             $aa->returned_at ? 'Devolucion' : 'Asignacion',
             $aa->asset?->internal_code, $aa->asset?->type?->name,

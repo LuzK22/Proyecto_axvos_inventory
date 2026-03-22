@@ -8,6 +8,7 @@ use App\Models\Asset;
 use App\Models\AssetEvent;
 use App\Models\AssignmentAsset;
 use App\Models\Branch;
+use App\Models\DeletionRequest;
 use App\Models\Status;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -184,6 +185,17 @@ class AssetTransitionController extends Controller
 
             $asset->update(['status_id' => $status->id]);
 
+            // Crear solicitud de baja pendiente de aprobación
+            if (!$asset->deletionRequests()->whereIn('status', [DeletionRequest::STATUS_PENDING, DeletionRequest::STATUS_APPROVED])->exists()) {
+                DeletionRequest::create([
+                    'asset_id'     => $asset->id,
+                    'requested_by' => auth()->id(),
+                    'reason'       => $request->reason,
+                    'notes'        => $request->notes,
+                    'status'       => DeletionRequest::STATUS_PENDING,
+                ]);
+            }
+
             // Si tuvo alguna asignación generamos el acta vinculada a ella
             $assignment = $asset->assignmentAssets()
                 ->with('assignment')
@@ -193,7 +205,7 @@ class AssetTransitionController extends Controller
             if ($assignment) {
                 $acta = Acta::create([
                     'assignment_id' => $assignment->id,
-                    'acta_number'   => Acta::generateActaNumber('baja'),
+                    'acta_number'   => Acta::generateActaNumber($asset->type?->category ?? 'TI', Acta::TYPE_BAJA),
                     'acta_type'     => Acta::TYPE_BAJA,
                     'status'        => Acta::STATUS_BORRADOR,
                     'generated_by'  => auth()->id(),
@@ -255,7 +267,7 @@ class AssetTransitionController extends Controller
             if ($assignment) {
                 $acta = Acta::create([
                     'assignment_id' => $assignment->id,
-                    'acta_number'   => Acta::generateActaNumber('donacion'),
+                    'acta_number'   => Acta::generateActaNumber($asset->type?->category ?? 'TI', Acta::TYPE_DONACION),
                     'acta_type'     => Acta::TYPE_DONACION,
                     'status'        => Acta::STATUS_BORRADOR,
                     'generated_by'  => auth()->id(),
@@ -317,7 +329,7 @@ class AssetTransitionController extends Controller
             if ($assignment) {
                 $acta = Acta::create([
                     'assignment_id' => $assignment->id,
-                    'acta_number'   => Acta::generateActaNumber('venta'),
+                    'acta_number'   => Acta::generateActaNumber($asset->type?->category ?? 'TI', Acta::TYPE_VENTA),
                     'acta_type'     => Acta::TYPE_VENTA,
                     'status'        => Acta::STATUS_BORRADOR,
                     'generated_by'  => auth()->id(),

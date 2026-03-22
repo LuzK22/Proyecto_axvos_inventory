@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Asset;
+use App\Models\AssetEvent;
 use App\Models\AssetType;
 use App\Models\Branch;
 use App\Models\DeletionRequest;
@@ -21,7 +22,7 @@ class AssetController extends Controller
             // El serial debe ser único; al editar excluimos el propio registro
             'serial'           => 'required|string|max:100|unique:assets,serial' . ($assetId ? ",{$assetId}" : ''),
             'asset_tag'        => 'nullable|string|max:100|unique:assets,asset_tag' . ($assetId ? ",{$assetId}" : ''),
-            'fixed_asset_code' => 'nullable|string|max:100',
+            'fixed_asset_code' => 'nullable|string|max:100|unique:assets,fixed_asset_code' . ($assetId ? ",{$assetId}" : ''),
             'property_type'    => 'required|in:PROPIO,LEASING,ALQUILADO,OTRO',
             'purchase_value'   => 'nullable|numeric|min:0',
             'purchase_date'    => 'nullable|date|before_or_equal:today',
@@ -130,7 +131,7 @@ class AssetController extends Controller
         $internalCode    = $type->generateAssetCode($lastNumber + 1);
         $availableStatus = Status::where('name', 'Disponible')->firstOrFail();
 
-        Asset::create([
+        $asset = Asset::create([
             'internal_code'    => $internalCode,
             'asset_type_id'    => $type->id,
             'brand'            => $request->brand,
@@ -142,9 +143,14 @@ class AssetController extends Controller
             'purchase_value'   => $request->purchase_value,
             'purchase_date'    => $request->purchase_date,
             'provider_name'    => $request->provider_name,
-            'status_id'        => $availableStatus->id, // todo activo nuevo nace como Disponible
+            'status_id'        => $availableStatus->id,
             'branch_id'        => $request->branch_id,
             'observations'     => $request->observations,
+            'created_by'       => auth()->id(),
+        ]);
+
+        AssetEvent::log($asset->load('status'), 'creacion', 'Disponible', [
+            'notes' => "Activo TI registrado: {$internalCode}.",
         ]);
 
         return redirect()
@@ -184,7 +190,11 @@ class AssetController extends Controller
             'provider_name'    => $request->provider_name,
             'branch_id'        => $request->branch_id,
             'observations'     => $request->observations,
-            // Nota: internal_code y status_id no se modifican aquí
+            'updated_by'       => auth()->id(),
+        ]);
+
+        AssetEvent::log($asset->fresh()->load('status'), 'actualizacion', $asset->fresh()->status?->name ?? '', [
+            'notes' => 'Datos del activo actualizados.',
         ]);
 
         return redirect()
@@ -285,7 +295,7 @@ class AssetController extends Controller
         $internalCode    = $type->generateAssetCode($lastNumber + 1);
         $availableStatus = Status::where('name', 'Disponible')->firstOrFail();
 
-        Asset::create([
+        $asset = Asset::create([
             'internal_code'    => $internalCode,
             'asset_type_id'    => $type->id,
             'brand'            => $request->brand,
@@ -300,6 +310,11 @@ class AssetController extends Controller
             'status_id'        => $availableStatus->id,
             'branch_id'        => $request->branch_id,
             'observations'     => $request->observations,
+            'created_by'       => auth()->id(),
+        ]);
+
+        AssetEvent::log($asset->load('status'), 'creacion', 'Disponible', [
+            'notes' => "Activo OTRO registrado: {$internalCode}.",
         ]);
 
         return redirect()
@@ -380,6 +395,11 @@ class AssetController extends Controller
             'provider_name'    => $request->provider_name,
             'branch_id'        => $request->branch_id,
             'observations'     => $request->observations,
+            'updated_by'       => auth()->id(),
+        ]);
+
+        AssetEvent::log($asset->fresh()->load('status'), 'actualizacion', $asset->fresh()->status?->name ?? '', [
+            'notes' => 'Datos del activo actualizados.',
         ]);
 
         return redirect()

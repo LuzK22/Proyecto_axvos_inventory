@@ -18,32 +18,28 @@
 @section('content')
 @include('partials._alerts')
 
-{{-- Stats --}}
-<div class="row mb-3">
-    <div class="col-6 col-md-3">
-        <div class="small-box" style="background:#7c3aed;color:#fff;">
-            <div class="inner"><h3>{{ $stats['total'] }}</h3><p>Total Activos</p></div>
-            <div class="icon"><i class="fas fa-boxes"></i></div>
-        </div>
-    </div>
-    <div class="col-6 col-md-3">
-        <div class="small-box bg-success">
-            <div class="inner"><h3>{{ $stats['asignados'] }}</h3><p>Asignados</p></div>
-            <div class="icon"><i class="fas fa-user-check"></i></div>
-        </div>
-    </div>
-    <div class="col-6 col-md-3">
-        <div class="small-box bg-info">
-            <div class="inner"><h3>{{ $stats['disponibles'] }}</h3><p>Disponibles</p></div>
-            <div class="icon"><i class="fas fa-box-open"></i></div>
-        </div>
-    </div>
-    <div class="col-6 col-md-3">
-        <div class="small-box bg-danger">
-            <div class="inner"><h3>{{ $stats['baja'] }}</h3><p>Dados de Baja</p></div>
-            <div class="icon"><i class="fas fa-ban"></i></div>
-        </div>
-    </div>
+{{-- Stats compactos y clicables --}}
+@php
+    $statusIds = \App\Models\Status::whereIn('name', ['Asignado','Disponible','Baja'])->pluck('id','name');
+@endphp
+<div class="d-flex flex-wrap mb-3" style="gap:8px;">
+    <a href="{{ route('assets.reports.index') }}"
+       class="btn btn-sm {{ !request()->hasAny(['status_id','property_type']) ? 'btn-primary' : 'btn-outline-primary' }}"
+       style="{{ !request()->hasAny(['status_id','property_type']) ? 'background:#7c3aed;border-color:#7c3aed;' : 'color:#7c3aed;border-color:#7c3aed;' }}">
+        <i class="fas fa-boxes mr-1"></i> Total: <strong>{{ $stats['total'] }}</strong>
+    </a>
+    <a href="{{ route('assets.reports.index', array_merge(request()->all(), ['status_id' => $statusIds['Asignado'] ?? ''])) }}"
+       class="btn btn-sm {{ request('status_id') == ($statusIds['Asignado'] ?? '') ? 'btn-success' : 'btn-outline-success' }}">
+        <i class="fas fa-user-check mr-1"></i> Asignados: <strong>{{ $stats['asignados'] }}</strong>
+    </a>
+    <a href="{{ route('assets.reports.index', array_merge(request()->all(), ['status_id' => $statusIds['Disponible'] ?? ''])) }}"
+       class="btn btn-sm {{ request('status_id') == ($statusIds['Disponible'] ?? '') ? 'btn-info' : 'btn-outline-info' }}">
+        <i class="fas fa-box-open mr-1"></i> Disponibles: <strong>{{ $stats['disponibles'] }}</strong>
+    </a>
+    <a href="{{ route('assets.reports.index', array_merge(request()->all(), ['status_id' => $statusIds['Baja'] ?? ''])) }}"
+       class="btn btn-sm {{ request('status_id') == ($statusIds['Baja'] ?? '') ? 'btn-danger' : 'btn-outline-danger' }}">
+        <i class="fas fa-ban mr-1"></i> Dados de Baja: <strong>{{ $stats['baja'] }}</strong>
+    </a>
 </div>
 
 {{-- Filtros --}}
@@ -79,12 +75,18 @@
                     <option value="{{ $b->id }}" {{ request('branch_id') == $b->id ? 'selected' : '' }}>{{ $b->name }}</option>
                 @endforeach
             </select>
+            <select name="property_type" class="form-control form-control-sm">
+                <option value="">Toda propiedad</option>
+                @foreach(['PROPIO','LEASING','ALQUILADO','OTRO'] as $pt)
+                    <option value="{{ $pt }}" {{ request('property_type') === $pt ? 'selected' : '' }}>{{ ucfirst(strtolower($pt)) }}</option>
+                @endforeach
+            </select>
             <button type="submit" class="btn btn-sm btn-primary">
                 <i class="fas fa-filter mr-1"></i> Filtrar
             </button>
-            @if(request()->hasAny(['q','type_id','status_id','branch_id','subcategory']))
+            @if(request()->hasAny(['q','type_id','status_id','branch_id','subcategory','property_type']))
                 <a href="{{ route('assets.reports.index') }}" class="btn btn-sm btn-outline-secondary">
-                    <i class="fas fa-times mr-1"></i> Limpiar
+                    <i class="fas fa-times mr-1"></i> Limpiar filtros
                 </a>
             @endif
         </form>

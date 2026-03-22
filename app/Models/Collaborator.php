@@ -3,9 +3,14 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 class Collaborator extends Model
 {
+    use SoftDeletes, LogsActivity;
+
     protected $fillable = [
         'full_name',
         'document',
@@ -17,6 +22,20 @@ class Collaborator extends Model
         'branch_id',
         'active',
     ];
+
+    protected $casts = [
+        'document' => 'encrypted',
+        'phone'    => 'encrypted',
+    ];
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly(['full_name', 'document', 'email', 'position', 'area', 'branch_id', 'active', 'modalidad_trabajo'])
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->setDescriptionForEvent(fn(string $eventName) => "Colaborador {$eventName}");
+    }
 
     // ─── Relaciones ────────────────────────────────────────
 

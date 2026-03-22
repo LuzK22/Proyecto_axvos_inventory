@@ -70,11 +70,11 @@
         <div class="row">
 
             <div class="col-md-4 mb-3">
-                <a href="{{ route('actas.index') }}" class="hub-btn"
+                <a href="{{ route('actas.index', ['category' => 'OTRO']) }}" class="hub-btn"
                    style="background:linear-gradient(135deg,#065f46,#047857);">
                     <div class="hub-btn-icon"><i class="fas fa-file-alt"></i></div>
                     <div class="hub-btn-text">
-                        <strong>Actas de Entrega</strong>
+                        <strong>Actas</strong>
                         <small>Ver y descargar actas</small>
                     </div>
                 </a>

@@ -136,10 +136,10 @@ return [
     */
 
     'usermenu_enabled' => true,
-    'usermenu_header' => false,
-    'usermenu_header_class' => 'bg-primary',
+    'usermenu_header' => true,
+    'usermenu_header_class' => 'bg-dark',
     'usermenu_image' => false,
-    'usermenu_desc' => false,
+    'usermenu_desc' => true,
     'usermenu_profile_url' => false,
 
     /*
@@ -341,10 +341,11 @@ return [
     */
     ['header' => 'OTROS ACTIVOS', 'can' => 'assets.view'],
 
-    ['text' => 'Otros Activos',     'icon' => 'fas fa-boxes',        'route' => 'assets.hub',            'can' => 'assets.view'],
-    ['text' => 'Asignaciones',      'icon' => 'fas fa-user-tag',     'route' => 'assets.assignments.hub','can' => 'assets.assign'],
-    ['text' => 'Bajas',             'icon' => 'fas fa-trash',        'route' => 'assets.disposals.hub',  'can' => 'assets.disposal.view'],
-    ['text' => 'Reportes',          'icon' => 'fas fa-file-excel',   'route' => 'assets.reports.hub',    'can' => 'assets.reports.view'],
+    ['text' => 'Otros Activos',          'icon' => 'fas fa-boxes',        'route' => 'assets.hub',            'can' => 'assets.view'],
+    ['text' => 'Asignaciones',           'icon' => 'fas fa-user-tag',     'route' => 'assets.assignments.hub','can' => 'assets.assign'],
+    ['text' => 'Préstamos Otros Activos','icon' => 'fas fa-handshake',    'route' => 'assets.loans.hub',      'can' => 'assets.view'],
+    ['text' => 'Bajas',                  'icon' => 'fas fa-trash',        'route' => 'assets.disposals.hub',  'can' => 'assets.disposal.view'],
+    ['text' => 'Reportes',               'icon' => 'fas fa-file-excel',   'route' => 'assets.reports.hub',    'can' => 'assets.reports.view'],
 
     /*
     |--------------------------------------------------------------------------
@@ -375,6 +376,52 @@ return [
     ['text' => 'Administración',    'icon' => 'fas fa-cog',           'route' => 'admin.hub',            'can' => 'users.manage'],
     ['text' => 'Documentación',     'icon' => 'fas fa-file-signature', 'route' => 'documents.hub',       'can' => 'tech.assets.assign'],
     ['text' => 'Asistente IA',      'icon' => 'fas fa-robot',          'route' => 'ai.hub',              'can' => 'tech.assets.view'],
+
+    /*
+    |--------------------------------------------------------------------------
+    | MI CUENTA — visible para todos los usuarios autenticados
+    |--------------------------------------------------------------------------
+    */
+    ['header' => 'MI CUENTA'],
+
+    [
+        'text'       => 'Centro de Seguridad',
+        'icon'       => 'fas fa-shield-alt',
+        'icon_color' => 'red',
+        'route'      => 'security.index',
+    ],
+    [
+        'text'       => 'Mi Perfil',
+        'icon'       => 'fas fa-user-cog',
+        'icon_color' => 'cyan',
+        'route'      => 'profile.edit',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | MENÚ DESPLEGABLE SUPERIOR — clic en el nombre del usuario (topnav)
+    |--------------------------------------------------------------------------
+    */
+    [
+        'text'        => 'Centro de Seguridad',
+        'icon'        => 'fas fa-shield-alt',
+        'icon_color'  => 'red',
+        'route'       => 'security.index',
+        'topnav_user' => true,
+    ],
+    [
+        'text'        => 'Mi Perfil',
+        'icon'        => 'fas fa-user-cog',
+        'topnav_user' => true,
+        'route'       => 'profile.edit',
+    ],
+    [
+        'text'        => 'Cambiar Contraseña',
+        'icon'        => 'fas fa-key',
+        'topnav_user' => true,
+        'route'       => 'profile.edit',
+        'url'         => 'profile#update-password-form',
+    ],
 
 ],
 

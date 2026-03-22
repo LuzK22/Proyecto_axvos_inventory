@@ -92,7 +92,7 @@
             @endcan
 
             <div class="col-md-4 mb-3">
-                <a href="{{ route('actas.index') }}" class="hub-btn"
+                <a href="{{ route('actas.index', ['category' => 'TI']) }}" class="hub-btn"
                    style="background:linear-gradient(135deg,#065f46,#047857);">
                     <div class="hub-btn-icon"><i class="fas fa-file-signature"></i></div>
                     <div class="hub-btn-text">
@@ -102,16 +102,6 @@
                 </a>
             </div>
 
-            <div class="col-md-4 mb-3">
-                <a href="{{ route('admin.assignment-templates.index') }}" class="hub-btn"
-                   style="background:linear-gradient(135deg,#92400e,#b45309);">
-                    <div class="hub-btn-icon"><i class="fas fa-clipboard-list"></i></div>
-                    <div class="hub-btn-text">
-                        <strong>Plantillas</strong>
-                        <small>Equipos por modalidad / cargo</small>
-                    </div>
-                </a>
-            </div>
 
         </div>
     </div>

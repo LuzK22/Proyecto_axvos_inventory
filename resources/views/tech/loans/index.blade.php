@@ -1,14 +1,29 @@
 @extends('adminlte::page')
-@section('title', 'Préstamos TI')
+@php
+    $filterConfig = [
+        'activo'   => ['label'=>'Préstamos Activos',   'color'=>'#1e3a8a', 'icon'=>'handshake',           'badge'=>'primary'],
+        'vencido'  => ['label'=>'Préstamos Vencidos',   'color'=>'#991b1b', 'icon'=>'exclamation-triangle', 'badge'=>'danger'],
+        'devuelto' => ['label'=>'Historial / Devueltos','color'=>'#374151', 'icon'=>'history',              'badge'=>'secondary'],
+        'all'      => ['label'=>'Todos los Préstamos',  'color'=>'#065f46', 'icon'=>'list',                 'badge'=>'success'],
+    ];
+    $current = $filterConfig[$filter] ?? $filterConfig['activo'];
+@endphp
+@section('title', $current['label'] . ' — TI')
 
 @section('content_header')
 <div class="d-flex justify-content-between align-items-center">
     <div>
-        <h1 class="m-0 text-dark"><i class="fas fa-handshake mr-2" style="color:#1e3a8a;"></i>Préstamos TI</h1>
+        <h1 class="m-0 text-dark">
+            <i class="fas fa-{{ $current['icon'] }} mr-2" style="color:{{ $current['color'] }};"></i>
+            {{ $current['label'] }}
+        </h1>
         <small class="text-muted">Préstamos temporales de activos tecnológicos</small>
     </div>
     <div>
-        <a href="{{ route('tech.loans.export', request()->all()) }}" class="btn btn-sm btn-success mr-1">
+        <a href="{{ route('tech.loans.hub') }}" class="btn btn-sm btn-secondary mr-1">
+            <i class="fas fa-arrow-left mr-1"></i> Volver
+        </a>
+        <a href="#" class="btn btn-sm btn-success mr-1" data-toggle="modal" data-target="#modalExportLoans">
             <i class="fas fa-file-csv mr-1"></i> Exportar
         </a>
         @can('tech.assets.assign')
@@ -23,31 +38,32 @@
 @section('content')
 @include('partials._alerts')
 
-<div class="row mb-3">
-    @foreach([['activo','primary','handshake',$activoCount,'Activos'],['vencido','danger','exclamation-triangle',$vencidoCount,'Vencidos'],['devuelto','secondary','undo',$devueltoCount,'Devueltos']] as [$f,$c,$ic,$cnt,$lbl])
-    <div class="col-4">
-        <a href="{{ route('tech.loans.index', ['filter'=>$f]) }}" class="text-decoration-none">
-            <div class="info-box shadow-sm mb-0" style="{{ $filter===$f ? '' : 'opacity:.7;' }}">
-                <span class="info-box-icon bg-{{ $c }}"><i class="fas fa-{{ $ic }}"></i></span>
-                <div class="info-box-content">
-                    <span class="info-box-text">{{ $lbl }}</span>
-                    <span class="info-box-number">{{ $cnt }}</span>
-                </div>
-            </div>
-        </a>
-    </div>
+{{-- Tabs de navegación --}}
+<div class="d-flex mb-3" style="gap:6px;flex-wrap:wrap;">
+    @foreach($filterConfig as $fKey => $fCfg)
+    @php
+        $count = match($fKey) {
+            'activo'   => $activoCount,
+            'vencido'  => $vencidoCount,
+            'devuelto' => $devueltoCount,
+            default    => $activoCount + $vencidoCount + $devueltoCount,
+        };
+        $isActive = $filter === $fKey;
+    @endphp
+    <a href="{{ route('tech.loans.index', array_merge(request()->except('filter'), ['filter'=>$fKey])) }}"
+       class="btn btn-sm {{ $isActive ? 'btn-'.$fCfg['badge'] : 'btn-outline-'.$fCfg['badge'] }}"
+       style="{{ $isActive ? 'font-weight:600;' : 'opacity:.8;' }}">
+        <i class="fas fa-{{ $fCfg['icon'] }} mr-1"></i>
+        {{ $fCfg['label'] }}
+        <span class="badge badge-light ml-1" style="font-size:.7rem;">{{ $count }}</span>
+    </a>
     @endforeach
 </div>
 
-<div class="card shadow-sm mb-3">
+{{-- Filtros adicionales --}}
+<div class="card shadow-sm mb-3" style="border-left:4px solid {{ $current['color'] }};">
     <div class="card-body py-2">
         <form method="GET" class="form-inline flex-wrap" style="gap:8px;">
-            <div class="btn-group btn-group-sm mr-2">
-                @foreach(['activo'=>'Activos','vencido'=>'Vencidos','devuelto'=>'Devueltos','all'=>'Todos'] as $f=>$label)
-                <a href="{{ route('tech.loans.index', ['filter'=>$f]) }}"
-                   class="btn {{ $filter===$f ? 'btn-primary' : 'btn-outline-secondary' }}">{{ $label }}</a>
-                @endforeach
-            </div>
             <input type="hidden" name="filter" value="{{ $filter }}">
             <input type="text" name="collaborator" value="{{ request('collaborator') }}"
                    class="form-control form-control-sm" placeholder="Colaborador / Cédula" style="min-width:180px;">
@@ -58,11 +74,23 @@
                 @endforeach
             </select>
             <button type="submit" class="btn btn-sm btn-primary"><i class="fas fa-filter mr-1"></i> Filtrar</button>
+            @if(request()->hasAny(['collaborator','branch_id']))
+                <a href="{{ route('tech.loans.index', ['filter'=>$filter]) }}" class="btn btn-sm btn-outline-secondary">
+                    <i class="fas fa-times mr-1"></i> Limpiar
+                </a>
+            @endif
         </form>
     </div>
 </div>
 
-<div class="card shadow-sm">
+<div class="card shadow-sm" style="border-top:3px solid {{ $current['color'] }};">
+    <div class="card-header py-2 d-flex justify-content-between align-items-center" style="font-size:.85rem;">
+        <span>
+            <i class="fas fa-{{ $current['icon'] }} mr-1" style="color:{{ $current['color'] }};"></i>
+            <strong>{{ $current['label'] }}</strong>
+            — {{ $loans->total() }} registro(s)
+        </span>
+    </div>
     <div class="card-body p-0">
         <table class="table table-sm table-hover mb-0">
             <thead class="thead-light" style="font-size:.75rem;text-transform:uppercase;">
@@ -130,5 +158,48 @@
         </table>
     </div>
     @if($loans->hasPages())<div class="card-footer">{{ $loans->links() }}</div>@endif
+</div>
+
+{{-- Modal exportar --}}
+<div class="modal fade" id="modalExportLoans" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header py-2">
+                <h6 class="modal-title font-weight-bold">
+                    <i class="fas fa-file-csv mr-1 text-success"></i> Exportar Préstamos
+                </h6>
+                <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+            </div>
+            <div class="modal-body p-3">
+                <p class="text-muted small mb-3">Selecciona qué préstamos quieres descargar:</p>
+                <div class="list-group list-group-flush">
+                    <a href="{{ route('tech.loans.export', ['filter'=>'activo']) }}"
+                       class="list-group-item list-group-item-action py-2 px-3 {{ $filter==='activo' ? 'active' : '' }}">
+                        <i class="fas fa-handshake mr-2"></i>
+                        Solo <strong>Activos</strong>
+                        <span class="badge badge-light float-right">{{ $activoCount }}</span>
+                    </a>
+                    <a href="{{ route('tech.loans.export', ['filter'=>'vencido']) }}"
+                       class="list-group-item list-group-item-action py-2 px-3 {{ $filter==='vencido' ? 'active' : '' }}">
+                        <i class="fas fa-exclamation-triangle mr-2"></i>
+                        Solo <strong>Vencidos</strong>
+                        <span class="badge badge-light float-right">{{ $vencidoCount }}</span>
+                    </a>
+                    <a href="{{ route('tech.loans.export', ['filter'=>'devuelto']) }}"
+                       class="list-group-item list-group-item-action py-2 px-3 {{ $filter==='devuelto' ? 'active' : '' }}">
+                        <i class="fas fa-undo mr-2"></i>
+                        Solo <strong>Devueltos</strong>
+                        <span class="badge badge-light float-right">{{ $devueltoCount }}</span>
+                    </a>
+                    <a href="{{ route('tech.loans.export') }}"
+                       class="list-group-item list-group-item-action py-2 px-3 {{ $filter==='all' ? 'active' : '' }}">
+                        <i class="fas fa-list mr-2"></i>
+                        <strong>Todos</strong> los préstamos
+                        <span class="badge badge-light float-right">{{ $activoCount + $vencidoCount + $devueltoCount }}</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 @stop

@@ -1,5 +1,4 @@
 @extends('adminlte::page')
-
 @section('title', 'Bajas TI')
 
 @section('content_header')
@@ -49,21 +48,27 @@
 
             @can('tech.assets.disposal.request')
             <div class="col-md-4 mb-3">
-                <div class="hub-btn hub-btn-soon">
+                <a href="{{ route('tech.disposals.create') }}" class="hub-btn"
+                   style="background:linear-gradient(135deg,#7f1d1d,#991b1b);">
                     <div class="hub-btn-icon"><i class="fas fa-file-medical-alt"></i></div>
-                    <div class="hub-btn-text"><strong>Nueva Solicitud</strong><small>Solicitar baja de activo</small></div>
-                    <span class="hub-soon-badge">Próximamente</span>
-                </div>
+                    <div class="hub-btn-text">
+                        <strong>Nueva Solicitud</strong>
+                        <small>Solicitar baja de activo TI</small>
+                    </div>
+                </a>
             </div>
             @endcan
 
-            @can('tech.assets.disposal.approve')
+            @can('assets.approve.deletion')
             <div class="col-md-4 mb-3">
-                <div class="hub-btn hub-btn-soon">
+                <a href="{{ route('deletion-requests.index', ['filter'=>'pending']) }}" class="hub-btn"
+                   style="background:linear-gradient(135deg,#78350f,#92400e);">
                     <div class="hub-btn-icon"><i class="fas fa-check-circle"></i></div>
-                    <div class="hub-btn-text"><strong>Aprobaciones Pendientes</strong><small>Revisar y aprobar bajas</small></div>
-                    <span class="hub-soon-badge">Próximamente</span>
-                </div>
+                    <div class="hub-btn-text">
+                        <strong>Aprobaciones Pendientes</strong>
+                        <small>Revisar y aprobar bajas</small>
+                    </div>
+                </a>
             </div>
             @endcan
 
@@ -76,13 +81,31 @@
         <p class="hub-section-title"><i class="fas fa-history mr-1"></i> Historial</p>
         <div class="row">
 
+            @can('tech.assets.disposal.view')
             <div class="col-md-4 mb-3">
-                <div class="hub-btn hub-btn-soon">
+                <a href="{{ route('tech.disposals.index', ['filter'=>'approved']) }}" class="hub-btn"
+                   style="background:linear-gradient(135deg,#374151,#4b5563);">
                     <div class="hub-btn-icon"><i class="fas fa-history"></i></div>
-                    <div class="hub-btn-text"><strong>Historial de Bajas</strong><small>Activos dados de baja</small></div>
-                    <span class="hub-soon-badge">Próximamente</span>
-                </div>
+                    <div class="hub-btn-text">
+                        <strong>Historial de Bajas</strong>
+                        <small>Activos aprobados y dados de baja</small>
+                    </div>
+                </a>
             </div>
+            @endcan
+
+            @can('assets.approve.deletion')
+            <div class="col-md-4 mb-3">
+                <a href="{{ route('deletion-requests.index', ['filter'=>'all']) }}" class="hub-btn"
+                   style="background:linear-gradient(135deg,#1e3a8a,#1d4ed8);">
+                    <div class="hub-btn-icon"><i class="fas fa-list-alt"></i></div>
+                    <div class="hub-btn-text">
+                        <strong>Todas las Solicitudes</strong>
+                        <small>Vista completa del aprobador</small>
+                    </div>
+                </a>
+            </div>
+            @endcan
 
         </div>
     </div>

@@ -3,12 +3,33 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use App\Models\AssetType;
 use App\Models\Branch;
+use App\Models\DeletionRequest;
 use App\Models\Status;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
+use App\Models\Scopes\BranchScope;
 
 class Asset extends Model
 {
+    use SoftDeletes, LogsActivity;
+
+    protected static function booted(): void
+    {
+        static::addGlobalScope(new BranchScope());
+    }
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly(['internal_code', 'asset_tag', 'brand', 'model', 'serial',
+                       'fixed_asset_code', 'status_id', 'branch_id', 'property_type'])
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->setDescriptionForEvent(fn(string $eventName) => "Activo {$eventName}");
+    }
     protected $fillable = [
         'asset_type_id',
         'internal_code',      // código autogenerado: TI-POR-00001
@@ -24,6 +45,8 @@ class Asset extends Model
         'status_id',
         'branch_id',
         'observations',
+        'created_by',
+        'updated_by',
     ];
 
     protected $casts = [
@@ -77,6 +100,22 @@ class Asset extends Model
     public function events()
     {
         return $this->hasMany(\App\Models\AssetEvent::class)->latest();
+    }
+
+    // Solicitudes de baja
+    public function deletionRequests()
+    {
+        return $this->hasMany(DeletionRequest::class);
+    }
+
+    public function createdBy()
+    {
+        return $this->belongsTo(\App\Models\User::class, 'created_by');
+    }
+
+    public function updatedBy()
+    {
+        return $this->belongsTo(\App\Models\User::class, 'updated_by');
     }
 
     // ─── Helpers de estado ─────────────────────────────────

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Asset;
+use App\Models\AssetEvent;
 use App\Models\Branch;
 use App\Models\Collaborator;
 use App\Models\Loan;
@@ -13,11 +14,11 @@ class LoanController extends Controller
 {
     public function index(Request $request)
     {
-        // Auto-update overdue status
-        Loan::where('status', 'activo')->where('end_date', '<', now()->startOfDay())->update(['status' => 'vencido']);
+        // Auto-update overdue status for TI loans only
+        Loan::forCategory('TI')->where('status', 'activo')->where('end_date', '<', now()->startOfDay())->update(['status' => 'vencido']);
 
         $filter = $request->get('filter', 'activo');
-        $q = Loan::with(['asset.type', 'collaborator.branch', 'creator']);
+        $q = Loan::forCategory('TI')->with(['asset.type', 'collaborator.branch', 'creator']);
 
         match ($filter) {
             'vencido'  => $q->where('status', 'vencido'),
@@ -27,17 +28,17 @@ class LoanController extends Controller
         };
 
         if ($request->filled('collaborator')) {
-            $s = $request->collaborator;
-            $q->whereHas('collaborator', fn($sq) => $sq->where('full_name','like',"%{$s}%")->orWhere('document','like',"%{$s}%"));
+            $s = $request->string('collaborator')->trim()->value();
+            $q->whereHas('collaborator', fn($sq) => $sq->where('full_name', 'like', '%'.$s.'%'));
         }
         if ($request->filled('branch_id')) {
             $q->whereHas('collaborator', fn($sq) => $sq->where('branch_id', $request->branch_id));
         }
 
         $loans         = $q->orderByDesc('created_at')->paginate(20)->withQueryString();
-        $activoCount   = Loan::where('status','activo')->count();
-        $vencidoCount  = Loan::where('status','vencido')->count();
-        $devueltoCount = Loan::where('status','devuelto')->count();
+        $activoCount   = Loan::forCategory('TI')->where('status','activo')->count();
+        $vencidoCount  = Loan::forCategory('TI')->where('status','vencido')->count();
+        $devueltoCount = Loan::forCategory('TI')->where('status','devuelto')->count();
         $branches      = Branch::where('active', true)->orderBy('name')->get();
 
         return view('tech.loans.index', compact('loans','filter','activoCount','vencidoCount','devueltoCount','branches'));
@@ -50,7 +51,7 @@ class LoanController extends Controller
             ->whereHas('status', fn($q) => $q->where('name','like','%Disponible%'))
             ->orderBy('internal_code')->get();
 
-        $collaborators = Collaborator::where('active', true)->orderBy('full_name')->get();
+        $collaborators = Collaborator::with('branch')->where('active', true)->orderBy('full_name')->get();
 
         return view('tech.loans.create', compact('assets','collaborators'));
     }
@@ -70,6 +71,11 @@ class LoanController extends Controller
         }
 
         $loan = Loan::create([...$data, 'status' => 'activo', 'created_by' => Auth::id()]);
+
+        $loanAsset = Asset::with('status')->find($data['asset_id']);
+        AssetEvent::log($loanAsset, 'prestamo', $loanAsset->status?->name ?? 'Disponible', [
+            'notes' => "Préstamo TI registrado. Vence: {$loan->end_date->format('d/m/Y')}.",
+        ]);
 
         return redirect()->route('tech.loans.show', $loan)->with('success', 'Préstamo registrado correctamente.');
     }
@@ -101,6 +107,12 @@ class LoanController extends Controller
             'returned_by' => Auth::id(),
             'notes'       => $request->notes ?: $loan->notes,
         ]);
+
+        $loan->load('asset.status');
+        AssetEvent::log($loan->asset, 'devolucion', $loan->asset->status?->name ?? 'Disponible', [
+            'notes' => "Devolución de préstamo TI #{$loan->id}." . ($request->notes ? " {$request->notes}" : ''),
+        ]);
+
         return redirect()->route('tech.loans.index')->with('success', "Préstamo #{$loan->id} registrado como devuelto.");
     }
 

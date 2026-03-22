@@ -27,7 +27,13 @@
          style="border-left:4px solid #0f766e;">
         <h6 class="mb-0 font-weight-bold">
             <i class="fas fa-file-signature mr-1" style="color:#0f766e;"></i>
-            Actas Digitales
+            @if($category === 'TI')
+                <span class="badge badge-primary mr-1" style="font-size:.78rem;">Actas TI</span>
+            @elseif($category === 'OTRO')
+                <span class="badge mr-1" style="background:#7c3aed;color:#fff;font-size:.78rem;">Actas Otros Activos</span>
+            @else
+                Todas las Actas
+            @endif
             <span class="badge badge-light ml-1" style="font-size:.7rem;">{{ $actas->total() }}</span>
         </h6>
         <div>
@@ -37,12 +43,34 @@
         </div>
     </div>
 
-    {{-- Filtros --}}
+    {{-- Tabs por TIPO de acta --}}
+    <div class="card-body pb-0 pt-2 border-bottom">
+        <div class="d-flex flex-wrap" style="gap:6px;">
+            @php
+                $typeTabs = [
+                    'all'        => ['label'=>'Todas',      'icon'=>'file-signature', 'color'=>'secondary'],
+                    'entrega'    => ['label'=>'Entrega',    'icon'=>'hand-holding',   'color'=>'primary'],
+                    'devolucion' => ['label'=>'Devolución', 'icon'=>'undo',           'color'=>'warning'],
+                    'baja'       => ['label'=>'Baja',       'icon'=>'ban',            'color'=>'danger'],
+                ];
+            @endphp
+            @foreach($typeTabs as $tKey => $tCfg)
+            <a href="{{ request()->fullUrlWithQuery(['type' => $tKey, 'filter' => $filter, 'category' => $category]) }}"
+               class="btn btn-sm {{ $typeTab === $tKey ? 'btn-'.$tCfg['color'] : 'btn-outline-'.$tCfg['color'] }} mb-2">
+                <i class="fas fa-{{ $tCfg['icon'] }} mr-1"></i>
+                {{ $tCfg['label'] }}
+                <span class="badge badge-light ml-1" style="font-size:.68rem;">{{ $counts[$tKey] ?? 0 }}</span>
+            </a>
+            @endforeach
+        </div>
+    </div>
+
+    {{-- Filtros por estado --}}
     <div class="card-body pb-0 pt-2">
-        <div class="d-flex gap-2 flex-wrap">
-            @foreach(['all' => 'Todas', 'pending' => 'Pendientes', 'signed' => 'Firmadas', 'draft' => 'Borradores'] as $key => $label)
-                <a href="{{ request()->fullUrlWithQuery(['filter' => $key]) }}"
-                   class="btn btn-xs {{ $filter === $key ? 'btn-primary' : 'btn-outline-secondary' }} mb-2">
+        <div class="d-flex flex-wrap" style="gap:6px;">
+            @foreach(['all' => 'Todos los estados', 'pending' => 'Pendientes', 'signed' => 'Firmadas', 'draft' => 'Borradores'] as $key => $label)
+                <a href="{{ request()->fullUrlWithQuery(['filter' => $key, 'category' => $category]) }}"
+                   class="btn btn-xs {{ $filter === $key ? 'btn-dark' : 'btn-outline-secondary' }} mb-2">
                     {{ $label }}
                 </a>
             @endforeach

@@ -111,6 +111,9 @@ class OtroAssetAssignmentController extends Controller
         ]);
 
         foreach ($request->assets as $assetId) {
+            $asset = Asset::withoutGlobalScopes()->findOrFail($assetId);
+            abort_unless($asset->type?->category === 'OTRO', 403, 'El activo no pertenece a la categoría OTRO.');
+
             AssignmentAsset::create([
                 'assignment_id' => $assignment->id,
                 'asset_id'      => $assetId,

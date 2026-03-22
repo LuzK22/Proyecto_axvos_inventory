@@ -12,6 +12,7 @@ use App\Models\Collaborator;
 use App\Models\Status;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class AssignmentController extends Controller
 {
@@ -62,7 +63,8 @@ class AssignmentController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'collaborator_id' => 'required|exists:collaborators,id',
+            // Colaborador debe existir Y estar activo
+            'collaborator_id' => ['required', Rule::exists('collaborators', 'id')->where('active', true)],
             'asset_ids'       => 'required|array|min:1',
             'asset_ids.*'     => 'exists:assets,id',
             'assignment_date' => 'required|date',
@@ -82,13 +84,15 @@ class AssignmentController extends Controller
                 ->withInput();
         }
 
-        DB::transaction(function () use ($request, $collaborator, $assets, $assignedStatus) {
+        $acta = null;
+
+        DB::transaction(function () use ($request, $collaborator, $assets, $assignedStatus, &$acta) {
 
             $assignment = Assignment::create([
                 'collaborator_id' => $collaborator->id,
                 'assigned_by'     => auth()->id(),
                 'assignment_date' => $request->assignment_date,
-                'work_modality'   => $collaborator->modalidad_trabajo, // heredamos la modalidad actual del colaborador
+                'work_modality'   => $collaborator->modalidad_trabajo,
                 'notes'           => $request->notes,
                 'status'          => 'activa',
             ]);
@@ -105,12 +109,18 @@ class AssignmentController extends Controller
             }
 
             // Generar acta de ENTREGA automática para TI (si aplica y sin duplicar)
-            Acta::generateDeliveryForAssignment($assignment, 'TI', auth()->user());
+            $acta = Acta::generateDeliveryForAssignment($assignment, 'TI', auth()->user());
         });
+
+        $msg = 'Asignación creada correctamente.';
+        if ($acta) {
+            $msg .= ' Se generó el Acta de Entrega TI.';
+            return redirect()->route('actas.show', $acta)->with('success', $msg);
+        }
 
         return redirect()
             ->route('tech.assignments.index')
-            ->with('success', 'Asignación creada correctamente.');
+            ->with('success', $msg);
     }
 
     /* =========================================================
@@ -269,8 +279,8 @@ class AssignmentController extends Controller
 
         $collaborators = Collaborator::where('active', true)
             ->where(function ($q) use ($query) {
-                $q->where('full_name', 'like', "%{$query}%")
-                  ->orWhere('document', 'like', "%{$query}%");
+                // document is encrypted — search by full_name only
+                $q->where('full_name', 'like', "%{$query}%");
             })
             ->with('branch')
             ->limit(10)
@@ -340,7 +350,6 @@ class AssignmentController extends Controller
             $q = $request->collaborator;
             $query->whereHas('collaborator', fn($c) =>
                 $c->where('full_name', 'like', "%{$q}%")
-                  ->orWhere('document', 'like', "%{$q}%")
             );
         }
 

@@ -112,28 +112,6 @@
     </div>
 </div>
 
-<div class="card shadow-sm">
-    <div class="card-body">
-        <p class="hub-section-title"><i class="fas fa-ban mr-1"></i> Bajas</p>
-        <div class="row">
-
-            @can('assets.disposal.view')
-            <div class="col-md-4 mb-3">
-                <a href="{{ route('assets.disposals.hub') }}" class="hub-btn"
-                   style="background:linear-gradient(135deg,#991b1b,#b91c1c);">
-                    <div class="hub-btn-icon"><i class="fas fa-ban"></i></div>
-                    <div class="hub-btn-text">
-                        <strong>Bajas de Activos</strong>
-                        <small>Gestionar desincorporaciones</small>
-                    </div>
-                </a>
-            </div>
-            @endcan
-
-        </div>
-    </div>
-</div>
-
 @stop
 
 @section('css')

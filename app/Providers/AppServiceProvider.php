@@ -2,6 +2,16 @@
 
 namespace App\Providers;
 
+use App\Listeners\LogAuthEvent;
+use App\Models\Asset;
+use App\Models\DeletionRequest;
+use App\Policies\AssetPolicy;
+use App\Policies\DeletionRequestPolicy;
+use Illuminate\Auth\Events\Failed;
+use Illuminate\Auth\Events\Login;
+use Illuminate\Auth\Events\Logout;
+use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\View;
 
@@ -14,6 +24,16 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        // ── Policies de autorización ───────────────────────────────────
+        Gate::policy(Asset::class, AssetPolicy::class);
+        Gate::policy(DeletionRequest::class, DeletionRequestPolicy::class);
+
+        // ── Listeners de autenticación (log de acceso) ─────────────────
+        $listener = new LogAuthEvent();
+        Event::listen(Login::class,  fn($e) => $listener->handleLogin($e));
+        Event::listen(Logout::class, fn($e) => $listener->handleLogout($e));
+        Event::listen(Failed::class, fn($e) => $listener->handleFailed($e));
+
         // ── Logo dinámico desde Configuración ─────────────────────────
         // Si la empresa subió su logo en Administración → Configuración,
         // reemplaza el logo del sidebar de AdminLTE automáticamente.
