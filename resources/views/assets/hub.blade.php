@@ -49,11 +49,14 @@
 
             @can('assets.create')
             <div class="col-md-4 mb-3">
-                <div class="hub-btn hub-btn-soon">
+                <a href="{{ route('assets.create') }}" class="hub-btn"
+                   style="background:linear-gradient(135deg,#7c3aed,#6d28d9);">
                     <div class="hub-btn-icon"><i class="fas fa-plus-circle"></i></div>
-                    <div class="hub-btn-text"><strong>Crear Activo General</strong><small>Registrar nuevo activo</small></div>
-                    <span class="hub-soon-badge">Próximamente</span>
-                </div>
+                    <div class="hub-btn-text">
+                        <strong>Crear Activo General</strong>
+                        <small>Registrar nuevo activo</small>
+                    </div>
+                </a>
             </div>
             @endcan
 

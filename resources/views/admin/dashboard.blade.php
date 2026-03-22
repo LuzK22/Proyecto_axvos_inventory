@@ -343,28 +343,42 @@
         </div>
     </div>
 
-    {{-- Asistente IA — placeholder hasta integrar Gemini --}}
+    {{-- AXI — Asistente IA --}}
     <div class="col-lg-4 mb-3">
         <div class="card shadow-sm h-100" style="border-top:3px solid #7c3aed;">
             <div class="card-header py-2" style="background:#f8f9fa;">
                 <h6 class="mb-0 font-weight-bold" style="font-size:.75rem;color:#374151;letter-spacing:.04em;text-transform:uppercase;">
-                    <i class="fas fa-robot mr-1" style="color:#7c3aed;"></i> Asistente IA
+                    <i class="fas fa-robot mr-1" style="color:#7c3aed;"></i> AXI — Asistente IA
                 </h6>
-            </div>
-            <div class="card-body d-flex flex-column align-items-center justify-content-center text-center py-4">
-                {{-- Ícono animado --}}
-                <div class="ai-icon-wrap mb-3">
-                    <i class="fas fa-robot" style="font-size:2.2rem;color:#7c3aed;opacity:.85;"></i>
-                    <span class="ai-pulse"></span>
+                <div class="card-tools">
+                    <a href="{{ route('ai.hub') }}" class="btn btn-xs btn-outline-secondary" style="font-size:.65rem;">
+                        Ver más
+                    </a>
                 </div>
-                <p class="font-weight-bold mb-1" style="font-size:.82rem;color:#374151;">
-                    Próximamente
+            </div>
+            <div class="card-body d-flex flex-column align-items-center justify-content-center text-center py-3 px-3">
+
+                {{-- Imagen C: robot de pie con AX en el pecho --}}
+                <img src="{{ asset('img/axi/axi-full.png') }}"
+                     alt="AXI"
+                     style="max-height:150px;max-width:100%;object-fit:contain;margin-bottom:10px;"
+                     onerror="this.style.display='none';document.getElementById('axi-dash-fallback').style.display='block';">
+                {{-- Fallback si la imagen no está guardada aún --}}
+                <div id="axi-dash-fallback" style="display:none;" class="mb-3">
+                    <div class="ai-icon-wrap">
+                        <i class="fas fa-robot" style="font-size:2.2rem;color:#7c3aed;opacity:.85;"></i>
+                        <span class="ai-pulse"></span>
+                    </div>
+                </div>
+
+                <p class="font-weight-bold mb-1" style="font-size:.88rem;color:#374151;">
+                    Próximamente — <span style="color:#7c3aed;">AXI</span>
                 </p>
                 <p class="text-muted mb-3" style="font-size:.74rem;line-height:1.5;">
                     Consulta tu inventario en lenguaje natural.<br>
                     <em>"¿Qué laptops están disponibles en Bogotá?"</em>
                 </p>
-                {{-- Input deshabilitado que muestra cómo será --}}
+
                 <div class="ai-input-preview w-100">
                     <input type="text"
                            class="form-control form-control-sm"
@@ -376,7 +390,7 @@
                     </button>
                 </div>
                 <small class="text-muted mt-2" style="font-size:.65rem;">
-                    Integración con Gemini AI en desarrollo
+                    Integración con IA en desarrollo
                 </small>
             </div>
         </div>

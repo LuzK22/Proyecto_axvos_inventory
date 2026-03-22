@@ -37,24 +37,28 @@ class AssetTypeController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'name'     => 'required|string|max:255',
-            'category' => 'required|in:TI,OTRO',
+            'name'        => 'required|string|max:255',
+            'category'    => 'required|in:TI,OTRO',
+            // Subcategoría: solo aplica a OTRO (ej: Mobiliario, Enseres)
+            'subcategory' => 'nullable|string|max:100',
         ]);
 
-        // Generar código automático (3 letras)
-        $code = strtoupper(substr($request->name, 0, 3));
+        // Generar código automático de 3 letras desde el nombre
+        $code = strtoupper(substr(preg_replace('/[^a-zA-Z]/', '', $request->name), 0, 3));
 
         AssetType::create([
-            'name'       => $request->name,
-            'code'       => $code,
-            'category'   => $request->category,
-            'active'     => true,
-            'created_by' => auth()->id(), // 👈 auditoría
+            'name'        => $request->name,
+            'code'        => $code,
+            'category'    => $request->category,
+            // Solo se guarda subcategoría para activos OTRO
+            'subcategory' => $request->category === 'OTRO' ? $request->subcategory : null,
+            'active'      => true,
+            'created_by'  => auth()->id(),
         ]);
 
         return redirect()
             ->route('asset-types.index', $request->category)
-            ->with('success', 'Tipo de activo creado correctamente');
+            ->with('success', 'Tipo de activo creado correctamente.');
     }
 
     /**
@@ -71,13 +75,16 @@ class AssetTypeController extends Controller
     public function update(Request $request, AssetType $assetType)
     {
         $request->validate([
-            'name'   => 'required|string|max:255',
-            'active' => 'nullable|boolean',
+            'name'        => 'required|string|max:255',
+            'subcategory' => 'nullable|string|max:100',
+            'active'      => 'nullable|boolean',
         ]);
 
         $assetType->update([
-            'name'   => $request->name,
-            'active' => $request->boolean('active', true),
+            'name'        => $request->name,
+            // Subcategoría solo aplica a OTRO
+            'subcategory' => $assetType->category === 'OTRO' ? $request->subcategory : null,
+            'active'      => $request->boolean('active', true),
         ]);
 
         return redirect()

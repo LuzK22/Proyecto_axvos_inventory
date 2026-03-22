@@ -92,19 +92,25 @@
             @endcan
 
             <div class="col-md-4 mb-3">
-                <div class="hub-btn hub-btn-soon">
-                    <div class="hub-btn-icon"><i class="fas fa-file-alt"></i></div>
-                    <div class="hub-btn-text"><strong>Acta de Entrega</strong><small>Generar acta en PDF</small></div>
-                    <span class="hub-soon-badge">Próximamente</span>
-                </div>
+                <a href="{{ route('actas.index') }}" class="hub-btn"
+                   style="background:linear-gradient(135deg,#065f46,#047857);">
+                    <div class="hub-btn-icon"><i class="fas fa-file-signature"></i></div>
+                    <div class="hub-btn-text">
+                        <strong>Actas</strong>
+                        <small>Entrega · Devolución · Préstamo</small>
+                    </div>
+                </a>
             </div>
 
             <div class="col-md-4 mb-3">
-                <div class="hub-btn hub-btn-soon">
-                    <div class="hub-btn-icon"><i class="fas fa-undo-alt"></i></div>
-                    <div class="hub-btn-text"><strong>Acta de Devolución</strong><small>Generar acta en PDF</small></div>
-                    <span class="hub-soon-badge">Próximamente</span>
-                </div>
+                <a href="{{ route('admin.assignment-templates.index') }}" class="hub-btn"
+                   style="background:linear-gradient(135deg,#92400e,#b45309);">
+                    <div class="hub-btn-icon"><i class="fas fa-clipboard-list"></i></div>
+                    <div class="hub-btn-text">
+                        <strong>Plantillas</strong>
+                        <small>Equipos por modalidad / cargo</small>
+                    </div>
+                </a>
             </div>
 
         </div>

@@ -21,6 +21,8 @@ use App\Http\Controllers\OtroAssetAssignmentController;
 use App\Http\Controllers\AreaController;
 use App\Http\Controllers\ActaExcelTemplateController;
 use App\Http\Controllers\ActaExcelTemplateFieldController;
+use App\Http\Controllers\LoanController;
+use App\Http\Controllers\AxiController;
 
 /*
 |--------------------------------------------------------------------------
@@ -170,11 +172,19 @@ Route::middleware(['auth'])->group(function () {
                 ->name('loans.hub')
                 ->middleware('can:tech.assets.view');
 
+            Route::get('/loans',               [LoanController::class, 'index'])         ->name('loans.index')        ->middleware('can:tech.assets.view');
+            Route::get('/loans/export',         [LoanController::class, 'export'])        ->name('loans.export')       ->middleware('can:tech.assets.view');
+            Route::get('/loans/create',         [LoanController::class, 'create'])        ->name('loans.create')       ->middleware('can:tech.assets.assign');
+            Route::post('/loans',               [LoanController::class, 'store'])         ->name('loans.store')        ->middleware('can:tech.assets.assign');
+            Route::get('/loans/{loan}',         [LoanController::class, 'show'])          ->name('loans.show')         ->middleware('can:tech.assets.view');
+            Route::get('/loans/{loan}/return',  [LoanController::class, 'returnForm'])    ->name('loans.return')       ->middleware('can:tech.assets.assign');
+            Route::post('/loans/{loan}/return', [LoanController::class, 'processReturn']) ->name('loans.return.store') ->middleware('can:tech.assets.assign');
+
             Route::get('/disposals/hub', fn() => view('tech.disposals.hub'))
                 ->name('disposals.hub')
                 ->middleware('can:tech.assets.disposal.view');
 
-            Route::get('/reports/hub', fn() => view('tech.reports.hub'))
+            Route::get('/reports/hub', [ReportController::class, 'tech'])
                 ->name('reports.hub')
                 ->middleware('can:tech.reports.view');
 
@@ -254,6 +264,10 @@ Route::middleware(['auth'])->group(function () {
             Route::get('/reports', [ReportController::class, 'tech'])
                 ->name('reports.index')
                 ->middleware('can:tech.reports.view');
+
+            Route::get('/reports/export', [ReportController::class, 'techExport'])
+                ->name('reports.export')
+                ->middleware('can:tech.reports.view');
         });
 
     /*
@@ -265,11 +279,27 @@ Route::middleware(['auth'])->group(function () {
         ->name('assets.')
         ->group(function () {
 
-            Route::get('/', [AssetController::class, 'assetsIndex'])
-                ->name('index')
-                ->middleware('can:assets.view');
+            // ── HUBS (deben ir ANTES de las rutas con parámetros) ──────────────
+            Route::get('/hub',              fn() => view('assets.hub'))               ->name('hub')              ->middleware('can:assets.view');
+            Route::get('/assignments/hub',  fn() => view('assets.assignments.hub'))   ->name('assignments.hub')  ->middleware('can:assets.assign');
+            Route::get('/disposals/hub',    fn() => view('assets.disposals.hub'))     ->name('disposals.hub')    ->middleware('can:assets.disposal.view');
+            Route::get('/reports/hub',      [ReportController::class, 'assets'])        ->name('reports.hub')      ->middleware('can:assets.reports.view');
 
-            // Asignaciones de Otros Activos — CRUD completo
+            // ── INVENTARIO DE OTROS ACTIVOS — CRUD ────────────────────────────
+            Route::middleware('can:assets.view')->group(function () {
+                Route::get('/',                    [AssetController::class, 'assetsIndex'])  ->name('index');
+                Route::get('/create',              [AssetController::class, 'assetsCreate']) ->name('create')
+                    ->middleware('can:assets.create');
+                Route::post('/',                   [AssetController::class, 'assetsStore'])  ->name('store')
+                    ->middleware('can:assets.create');
+                Route::get('/{asset}',             [AssetController::class, 'assetsShow'])   ->name('show');
+                Route::get('/{asset}/edit',        [AssetController::class, 'assetsEdit'])   ->name('edit')
+                    ->middleware('can:assets.edit');
+                Route::put('/{asset}',             [AssetController::class, 'assetsUpdate']) ->name('update')
+                    ->middleware('can:assets.edit');
+            });
+
+            // ── ASIGNACIONES DE OTROS ACTIVOS — CRUD ──────────────────────────
             Route::middleware('can:assets.assign')->group(function () {
                 Route::get('/assignments',                          [OtroAssetAssignmentController::class, 'index'])        ->name('assignments.index');
                 Route::get('/assignments/create',                   [OtroAssetAssignmentController::class, 'create'])       ->name('assignments.create');
@@ -279,6 +309,7 @@ Route::middleware(['auth'])->group(function () {
                 Route::post('/assignments/{assignment}/return',     [OtroAssetAssignmentController::class, 'processReturn'])->name('assignments.return.process');
             });
 
+            // ── HISTORIAL, BAJAS Y REPORTES ────────────────────────────────────
             Route::get('/history', [AssetController::class, 'assetsHistory'])
                 ->name('history.index')
                 ->middleware('can:assets.history.view');
@@ -291,11 +322,9 @@ Route::middleware(['auth'])->group(function () {
                 ->name('reports.index')
                 ->middleware('can:assets.reports.view');
 
-            // Hubs de Otros Activos
-            Route::get('/hub',              fn() => view('assets.hub'))               ->name('hub')              ->middleware('can:assets.view');
-            Route::get('/assignments/hub',  fn() => view('assets.assignments.hub'))   ->name('assignments.hub')  ->middleware('can:assets.assign');
-            Route::get('/disposals/hub',    fn() => view('assets.disposals.hub'))     ->name('disposals.hub')    ->middleware('can:assets.disposal.view');
-            Route::get('/reports/hub',      fn() => view('assets.reports.hub'))       ->name('reports.hub')      ->middleware('can:assets.reports.view');
+            Route::get('/reports/export', [ReportController::class, 'assetsExport'])
+                ->name('reports.export')
+                ->middleware('can:assets.reports.view');
         });
 
     // Áreas (espacios físicos para asignación de Otros Activos)
@@ -340,7 +369,13 @@ Route::middleware(['auth'])->group(function () {
         Route::patch('/{acta}/void',              [ActaController::class, 'void'])        ->name('void');
         Route::post('/generate/{assignment}',     [ActaController::class, 'generate'])    ->name('generate');
     });
-    Route::get('/ai/hub',          fn() => view('ai.hub'))          ->name('ai.hub')          ->middleware('auth');
+    Route::prefix('ai')->name('ai.')->middleware('auth')->group(function () {
+        Route::get('/hub',                                 [AxiController::class, 'hub'])                ->name('hub');
+        Route::post('/new',                                [AxiController::class, 'newConversation'])    ->name('new');
+        Route::post('/chat',                               [AxiController::class, 'chat'])               ->name('chat');
+        Route::delete('/conversations/{conversation}',     [AxiController::class, 'deleteConversation']) ->name('delete');
+        Route::get('/conversations/{conversation}/export', [AxiController::class, 'exportConversation']) ->name('export');
+    });
 
     /*
     |--------------------------------------------------------------------------
@@ -550,5 +585,9 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/reports/global', [ReportController::class, 'global'])
             ->name('reports.global')
             ->middleware('can:reports.global');
+
+        Route::get('/reports/collaborators/export', [ReportController::class, 'collaboratorsExport'])
+            ->name('reports.collaborators.export')
+            ->middleware('can:reports.view');
     });
 });

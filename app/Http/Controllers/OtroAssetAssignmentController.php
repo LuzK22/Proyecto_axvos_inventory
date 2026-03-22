@@ -66,29 +66,48 @@ class OtroAssetAssignmentController extends Controller
 
     public function store(Request $request)
     {
+        /*
+         * Destinos posibles:
+         *   collaborator → colaborador individual
+         *   jefe         → jefe/responsable de área (sigue siendo un colaborador)
+         *   area         → espacio físico compartido
+         *   pool         → pool rotativo (puede o no tener área asociada)
+         */
         $request->validate([
-            'recipient_type'   => 'required|in:collaborator,area',
-            'collaborator_id'  => 'required_if:recipient_type,collaborator|nullable|exists:collaborators,id',
-            'area_id'          => 'required_if:recipient_type,area|nullable|exists:areas,id',
+            'destination_type' => 'required|in:collaborator,jefe,area,pool',
+            // Colaborador requerido para destinos collaborator y jefe
+            'collaborator_id'  => 'required_if:destination_type,collaborator|required_if:destination_type,jefe|nullable|exists:collaborators,id',
+            // Área requerida solo para destino area; opcional para pool
+            'area_id'          => 'required_if:destination_type,area|nullable|exists:areas,id',
             'assignment_date'  => 'required|date',
             'assets'           => 'required|array|min:1',
             'assets.*'         => 'exists:assets,id',
             'notes'            => 'nullable|string|max:500',
         ], [
-            'collaborator_id.required_if' => 'Selecciona un colaborador.',
-            'area_id.required_if'         => 'Selecciona un área.',
+            'collaborator_id.required_if' => 'Selecciona un colaborador o jefe responsable.',
+            'area_id.required_if'         => 'Selecciona el área donde quedará el activo.',
             'assets.required'             => 'Selecciona al menos un activo.',
         ]);
 
+        // Para pool sin área específica se permite null en area_id
+        $collaboratorId = in_array($request->destination_type, ['collaborator', 'jefe'])
+            ? $request->collaborator_id
+            : null;
+
+        $areaId = in_array($request->destination_type, ['area', 'pool'])
+            ? $request->area_id
+            : null;
+
         $assignment = Assignment::create([
-            'collaborator_id' => $request->recipient_type === 'collaborator' ? $request->collaborator_id : null,
-            'area_id'         => $request->recipient_type === 'area'         ? $request->area_id         : null,
-            'asset_category'  => 'OTRO',
-            'assigned_by'     => auth()->id(),
-            'assignment_date' => $request->assignment_date,
-            'work_modality'   => 'presencial',
-            'notes'           => $request->notes,
-            'status'          => 'activa',
+            'collaborator_id'  => $collaboratorId,
+            'area_id'          => $areaId,
+            'destination_type' => $request->destination_type,
+            'asset_category'   => 'OTRO',
+            'assigned_by'      => auth()->id(),
+            'assignment_date'  => $request->assignment_date,
+            'work_modality'    => $request->work_modality ?? 'presencial',
+            'notes'            => $request->notes,
+            'status'           => 'activa',
         ]);
 
         foreach ($request->assets as $assetId) {

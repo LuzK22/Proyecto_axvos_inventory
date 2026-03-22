@@ -1,647 +1,391 @@
 @extends('adminlte::page')
-
 @section('title', 'Auditoría Global')
 
 @section('content_header')
-    <div class="d-flex justify-content-between align-items-center">
-        <div>
-            <h1 class="m-0 text-dark">
-                <i class="fas fa-search-dollar text-primary mr-2"></i>Auditoría Global
-            </h1>
-            <small class="text-muted">Consulta, filtra y exporta toda la información del inventario</small>
-        </div>
+<div class="d-flex justify-content-between align-items-center">
+    <div>
+        <h1 class="m-0 text-dark">
+            <i class="fas fa-search mr-2 text-primary"></i>Auditoría Global
+        </h1>
+        <small class="text-muted">Vista consolidada de todos los activos, asignaciones y movimientos</small>
     </div>
+    @can('audit.export')
+    <a href="{{ route('audit.export', array_merge(request()->all(), ['tab' => $tab])) }}"
+       class="btn btn-sm btn-success">
+        <i class="fas fa-file-csv mr-1"></i> Exportar CSV
+    </a>
+    @endcan
+</div>
 @stop
 
 @section('content')
 
-@include('partials._alerts')
-
-{{-- ── Stats globales ──────────────────────────────────────── --}}
-<div class="d-flex flex-wrap mb-3" style="gap:.5rem;">
-    <div class="audit-chip">
-        <span class="audit-chip-num text-dark">{{ number_format($stats['total_assets']) }}</span>
-        <span class="audit-chip-label">Total Activos</span>
+{{-- Stats --}}
+<div class="row mb-3">
+    <div class="col-6 col-md-3 col-lg">
+        <div class="info-box shadow-sm mb-2">
+            <span class="info-box-icon bg-primary"><i class="fas fa-boxes"></i></span>
+            <div class="info-box-content">
+                <span class="info-box-text" style="font-size:.75rem;">Total Activos</span>
+                <span class="info-box-number">{{ $stats['total_assets'] }}</span>
+            </div>
+        </div>
     </div>
-    <div class="audit-chip">
-        <span class="audit-chip-num text-primary">{{ $stats['ti_assets'] }}</span>
-        <span class="audit-chip-label">Activos TI</span>
+    <div class="col-6 col-md-3 col-lg">
+        <div class="info-box shadow-sm mb-2">
+            <span class="info-box-icon bg-info"><i class="fas fa-laptop"></i></span>
+            <div class="info-box-content">
+                <span class="info-box-text" style="font-size:.75rem;">Activos TI</span>
+                <span class="info-box-number">{{ $stats['ti_assets'] }}</span>
+            </div>
+        </div>
     </div>
-    <div class="audit-chip">
-        <span class="audit-chip-num text-success">{{ $stats['otro_assets'] }}</span>
-        <span class="audit-chip-label">Otros Activos</span>
+    <div class="col-6 col-md-3 col-lg">
+        <div class="info-box shadow-sm mb-2">
+            <span class="info-box-icon" style="background:#7c3aed;"><i class="fas fa-boxes" style="color:#fff;"></i></span>
+            <div class="info-box-content">
+                <span class="info-box-text" style="font-size:.75rem;">Otros Activos</span>
+                <span class="info-box-number">{{ $stats['otro_assets'] }}</span>
+            </div>
+        </div>
     </div>
-    <div class="audit-chip">
-        <span class="audit-chip-num text-info">{{ $stats['active_assignments'] }}</span>
-        <span class="audit-chip-label">Asignaciones activas</span>
+    <div class="col-6 col-md-3 col-lg">
+        <div class="info-box shadow-sm mb-2">
+            <span class="info-box-icon bg-success"><i class="fas fa-user-check"></i></span>
+            <div class="info-box-content">
+                <span class="info-box-text" style="font-size:.75rem;">Asignaciones Activas</span>
+                <span class="info-box-number">{{ $stats['active_assignments'] }}</span>
+            </div>
+        </div>
     </div>
-    <div class="audit-chip">
-        <span class="audit-chip-num text-warning">{{ $stats['active_loans'] }}</span>
-        <span class="audit-chip-label">Préstamos activos</span>
-    </div>
-    @if($stats['overdue_loans'] > 0)
-    <div class="audit-chip" style="border-color:#dc3545;">
-        <span class="audit-chip-num text-danger">{{ $stats['overdue_loans'] }}</span>
-        <span class="audit-chip-label">Préstamos vencidos</span>
-    </div>
-    @endif
-    <div class="audit-chip">
-        <span class="audit-chip-num" style="color:#6f42c1;">{{ $stats['collaborators'] }}</span>
-        <span class="audit-chip-label">Colaboradores</span>
+    <div class="col-6 col-md-3 col-lg">
+        <div class="info-box shadow-sm mb-2">
+            <span class="info-box-icon {{ $stats['overdue_loans'] > 0 ? 'bg-danger' : 'bg-warning' }}">
+                <i class="fas fa-clock"></i>
+            </span>
+            <div class="info-box-content">
+                <span class="info-box-text" style="font-size:.75rem;">Préstamos Activos</span>
+                <span class="info-box-number">{{ $stats['active_loans'] }}
+                    @if($stats['overdue_loans'] > 0)
+                        <small class="text-danger" style="font-size:.65rem;">({{ $stats['overdue_loans'] }} vencidos)</small>
+                    @endif
+                </span>
+            </div>
+        </div>
     </div>
 </div>
 
-{{-- ── Tabs ─────────────────────────────────────────────────── --}}
-<ul class="nav nav-tabs nav-fill mb-0" id="auditTabs" role="tablist" style="border-bottom:none;">
-    @php
-        $tabs = [
-            'ti'           => ['icon'=>'fa-laptop',      'color'=>'text-primary',   'label'=>'Activos TI'],
-            'otros'        => ['icon'=>'fa-boxes',        'color'=>'text-success',   'label'=>'Otros Activos'],
-            'prestamos'    => ['icon'=>'fa-handshake',    'color'=>'text-warning',   'label'=>'Préstamos'],
-            'asignaciones' => ['icon'=>'fa-user-check',   'color'=>'text-info',      'label'=>'Asignaciones'],
-            'log'          => ['icon'=>'fa-history',      'color'=>'text-secondary', 'label'=>'Log de Movimientos'],
-        ];
-    @endphp
-    @foreach($tabs as $key => $t)
-        <li class="nav-item">
-            <a class="nav-link font-weight-bold {{ $tab === $key ? 'active' : '' }}"
-               href="{{ route('audit.hub', array_merge(request()->except(['tab','page']), ['tab' => $key])) }}">
-                <i class="fas {{ $t['icon'] }} mr-1 {{ $t['color'] }}"></i>
-                {{ $t['label'] }}
-            </a>
-        </li>
+{{-- Tabs --}}
+<ul class="nav nav-tabs mb-0" style="border-bottom:2px solid #dee2e6;">
+    @foreach([
+        ['ti',           'fa-laptop',        'Activos TI'],
+        ['otros',        'fa-boxes',         'Otros Activos'],
+        ['prestamos',    'fa-handshake',     'Préstamos'],
+        ['asignaciones', 'fa-user-check',    'Asignaciones'],
+        ['log',          'fa-history',       'Log Movimientos'],
+    ] as [$key, $icon, $label])
+    <li class="nav-item">
+        <a class="nav-link {{ $tab === $key ? 'active font-weight-bold' : 'text-muted' }}"
+           href="{{ route('audit.hub', array_merge(request()->except('page'), ['tab' => $key])) }}">
+            <i class="fas {{ $icon }} mr-1"></i> {{ $label }}
+        </a>
+    </li>
     @endforeach
 </ul>
 
-<div class="card card-outline card-primary mb-0"
-     style="border-top-left-radius:0;border-top-right-radius:0;">
+<div class="card shadow-sm" style="border-top-left-radius:0;border-top-right-radius:0;">
 
-    {{-- ═══════════════════════════════════════════════════════
-         FILTROS según tab activo
-    ════════════════════════════════════════════════════════════ --}}
-    <div class="card-body py-2 px-3" style="background:#fafbfc;border-bottom:1px solid #dee2e6;">
-        <form id="filterForm" method="GET" action="{{ route('audit.hub') }}">
+    {{-- ── Filtros ──────────────────────────────────────────────────────── --}}
+    <div class="card-body py-2 border-bottom bg-light">
+        <form method="GET" class="form-inline flex-wrap" style="gap:6px;">
             <input type="hidden" name="tab" value="{{ $tab }}">
 
-            <div class="row align-items-end" style="gap:.25rem 0;">
-
-                {{-- ── Activos TI & Otros: filtros de activo ──────── --}}
-                @if(in_array($tab, ['ti', 'otros']))
-                    <div class="col-md-3 pr-1">
-                        <input type="text" name="search" class="form-control form-control-sm"
-                               placeholder="Código, marca, modelo, serial..."
-                               value="{{ request('search') }}">
-                    </div>
-                    <div class="col-md-2 px-1">
-                        <select name="type_id" class="form-control form-control-sm auto-submit">
-                            <option value="">Todos los tipos</option>
-                            @foreach($tab === 'ti' ? $tiTypes : $otroTypes as $t)
-                                <option value="{{ $t->id }}" {{ request('type_id') == $t->id ? 'selected' : '' }}>
-                                    {{ $t->name }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="col-md-2 px-1">
-                        <select name="status_id" class="form-control form-control-sm auto-submit">
-                            <option value="">Todos los estados</option>
-                            @foreach($statuses as $s)
-                                <option value="{{ $s->id }}" {{ request('status_id') == $s->id ? 'selected' : '' }}>
-                                    {{ $s->name }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="col-md-2 px-1">
-                        <select name="branch_id" class="form-control form-control-sm auto-submit">
-                            <option value="">Todas las sucursales</option>
-                            @foreach($branches as $b)
-                                <option value="{{ $b->id }}" {{ request('branch_id') == $b->id ? 'selected' : '' }}>
-                                    {{ $b->name }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="col-md-2 px-1">
-                        <select name="property_type" class="form-control form-control-sm auto-submit">
-                            <option value="">Propiedad: todas</option>
-                            <option value="PROPIO"    {{ request('property_type') === 'PROPIO'    ? 'selected' : '' }}>Propio</option>
-                            <option value="LEASING"   {{ request('property_type') === 'LEASING'   ? 'selected' : '' }}>Leasing</option>
-                            <option value="ALQUILADO" {{ request('property_type') === 'ALQUILADO' ? 'selected' : '' }}>Alquilado</option>
-                            <option value="OTRO"      {{ request('property_type') === 'OTRO'      ? 'selected' : '' }}>Otro</option>
-                        </select>
-                    </div>
-                    {{-- Rango fechas ingreso --}}
-                    <div class="col-md-2 pr-1 mt-1">
-                        <div class="input-group input-group-sm">
-                            <div class="input-group-prepend">
-                                <span class="input-group-text bg-white" style="font-size:.7rem;">Desde</span>
-                            </div>
-                            <input type="date" name="from" class="form-control form-control-sm"
-                                   value="{{ request('from') }}">
-                        </div>
-                    </div>
-                    <div class="col-md-2 px-1 mt-1">
-                        <div class="input-group input-group-sm">
-                            <div class="input-group-prepend">
-                                <span class="input-group-text bg-white" style="font-size:.7rem;">Hasta</span>
-                            </div>
-                            <input type="date" name="to" class="form-control form-control-sm"
-                                   value="{{ request('to') }}">
-                        </div>
-                    </div>
+            @if(in_array($tab, ['ti', 'otros']))
+                <input type="text" name="search" value="{{ request('search') }}"
+                       class="form-control form-control-sm" placeholder="Buscar código, marca, serial..."
+                       style="min-width:200px;">
+                @if($tab === 'ti')
+                <select name="type_id" class="form-control form-control-sm">
+                    <option value="">Todos los tipos TI</option>
+                    @foreach($tiTypes as $t)
+                        <option value="{{ $t->id }}" {{ request('type_id') == $t->id ? 'selected' : '' }}>{{ $t->name }}</option>
+                    @endforeach
+                </select>
+                @else
+                <select name="type_id" class="form-control form-control-sm">
+                    <option value="">Todos los tipos</option>
+                    @foreach($otroTypes as $t)
+                        <option value="{{ $t->id }}" {{ request('type_id') == $t->id ? 'selected' : '' }}>{{ $t->name }}</option>
+                    @endforeach
+                </select>
                 @endif
+                <select name="status_id" class="form-control form-control-sm">
+                    <option value="">Todos los estados</option>
+                    @foreach($statuses as $s)
+                        <option value="{{ $s->id }}" {{ request('status_id') == $s->id ? 'selected' : '' }}>{{ $s->name }}</option>
+                    @endforeach
+                </select>
+                <select name="branch_id" class="form-control form-control-sm">
+                    <option value="">Todas las sucursales</option>
+                    @foreach($branches as $b)
+                        <option value="{{ $b->id }}" {{ request('branch_id') == $b->id ? 'selected' : '' }}>{{ $b->name }}</option>
+                    @endforeach
+                </select>
+                <select name="property_type" class="form-control form-control-sm">
+                    <option value="">Todos</option>
+                    <option value="PROPIO" {{ request('property_type') === 'PROPIO' ? 'selected' : '' }}>Propio</option>
+                    <option value="LEASING" {{ request('property_type') === 'LEASING' ? 'selected' : '' }}>Leasing</option>
+                    <option value="ALQUILADO" {{ request('property_type') === 'ALQUILADO' ? 'selected' : '' }}>Alquilado</option>
+                </select>
+            @endif
 
-                {{-- ── Préstamos ────────────────────────────────────── --}}
-                @if($tab === 'prestamos')
-                    <div class="col-md-3 pr-1">
-                        <input type="text" name="collaborator" class="form-control form-control-sm"
-                               placeholder="Colaborador o cédula..."
-                               value="{{ request('collaborator') }}">
-                    </div>
-                    <div class="col-md-2 px-1">
-                        <select name="loan_status" class="form-control form-control-sm auto-submit">
-                            <option value="">Todos los estados</option>
-                            <option value="activo"   {{ request('loan_status') === 'activo'   ? 'selected' : '' }}>Activo</option>
-                            <option value="vencido"  {{ request('loan_status') === 'vencido'  ? 'selected' : '' }}>Vencido</option>
-                            <option value="devuelto" {{ request('loan_status') === 'devuelto' ? 'selected' : '' }}>Devuelto</option>
-                        </select>
-                    </div>
-                    <div class="col-md-2 px-1">
-                        <select name="branch_id" class="form-control form-control-sm auto-submit">
-                            <option value="">Todas las sucursales</option>
-                            @foreach($branches as $b)
-                                <option value="{{ $b->id }}" {{ request('branch_id') == $b->id ? 'selected' : '' }}>
-                                    {{ $b->name }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="col-md-2 px-1">
-                        <div class="input-group input-group-sm">
-                            <div class="input-group-prepend">
-                                <span class="input-group-text bg-white" style="font-size:.7rem;">Desde</span>
-                            </div>
-                            <input type="date" name="from" class="form-control form-control-sm" value="{{ request('from') }}">
-                        </div>
-                    </div>
-                    <div class="col-md-2 px-1">
-                        <div class="input-group input-group-sm">
-                            <div class="input-group-prepend">
-                                <span class="input-group-text bg-white" style="font-size:.7rem;">Hasta</span>
-                            </div>
-                            <input type="date" name="to" class="form-control form-control-sm" value="{{ request('to') }}">
-                        </div>
-                    </div>
-                @endif
+            @if($tab === 'prestamos')
+                <input type="text" name="collaborator" value="{{ request('collaborator') }}"
+                       class="form-control form-control-sm" placeholder="Colaborador / Cédula">
+                <select name="loan_status" class="form-control form-control-sm">
+                    <option value="">Todos los estados</option>
+                    <option value="activo" {{ request('loan_status') === 'activo' ? 'selected' : '' }}>Activo</option>
+                    <option value="devuelto" {{ request('loan_status') === 'devuelto' ? 'selected' : '' }}>Devuelto</option>
+                    <option value="vencido" {{ request('loan_status') === 'vencido' ? 'selected' : '' }}>Vencido</option>
+                </select>
+                <select name="branch_id" class="form-control form-control-sm">
+                    <option value="">Todas las sucursales</option>
+                    @foreach($branches as $b)
+                        <option value="{{ $b->id }}" {{ request('branch_id') == $b->id ? 'selected' : '' }}>{{ $b->name }}</option>
+                    @endforeach
+                </select>
+            @endif
 
-                {{-- ── Asignaciones ─────────────────────────────────── --}}
-                @if($tab === 'asignaciones')
-                    <div class="col-md-3 pr-1">
-                        <input type="text" name="collaborator" class="form-control form-control-sm"
-                               placeholder="Colaborador o cédula..."
-                               value="{{ request('collaborator') }}">
-                    </div>
-                    <div class="col-md-2 px-1">
-                        <select name="assign_status" class="form-control form-control-sm auto-submit">
-                            <option value="">Todos los estados</option>
-                            <option value="activa"   {{ request('assign_status') === 'activa'   ? 'selected' : '' }}>Activa</option>
-                            <option value="devuelta" {{ request('assign_status') === 'devuelta' ? 'selected' : '' }}>Devuelta</option>
-                        </select>
-                    </div>
-                    <div class="col-md-2 px-1">
-                        <select name="modality" class="form-control form-control-sm auto-submit">
-                            <option value="">Modalidad: todas</option>
-                            <option value="presencial" {{ request('modality') === 'presencial' ? 'selected' : '' }}>Presencial</option>
-                            <option value="remoto"     {{ request('modality') === 'remoto'     ? 'selected' : '' }}>Remoto</option>
-                            <option value="hibrido"    {{ request('modality') === 'hibrido'    ? 'selected' : '' }}>Híbrido</option>
-                        </select>
-                    </div>
-                    <div class="col-md-2 px-1">
-                        <select name="branch_id" class="form-control form-control-sm auto-submit">
-                            <option value="">Todas las sucursales</option>
-                            @foreach($branches as $b)
-                                <option value="{{ $b->id }}" {{ request('branch_id') == $b->id ? 'selected' : '' }}>
-                                    {{ $b->name }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="col-md-2 px-1">
-                        <div class="input-group input-group-sm">
-                            <div class="input-group-prepend">
-                                <span class="input-group-text bg-white" style="font-size:.7rem;">Desde</span>
-                            </div>
-                            <input type="date" name="from" class="form-control form-control-sm" value="{{ request('from') }}">
-                        </div>
-                    </div>
-                    <div class="col-md-1 pl-1">
-                        <div class="input-group input-group-sm">
-                            <div class="input-group-prepend">
-                                <span class="input-group-text bg-white" style="font-size:.7rem;">Hasta</span>
-                            </div>
-                            <input type="date" name="to" class="form-control form-control-sm" value="{{ request('to') }}">
-                        </div>
-                    </div>
-                @endif
+            @if($tab === 'asignaciones')
+                <input type="text" name="collaborator" value="{{ request('collaborator') }}"
+                       class="form-control form-control-sm" placeholder="Colaborador / Cédula">
+                <select name="assign_status" class="form-control form-control-sm">
+                    <option value="">Todas</option>
+                    <option value="activa" {{ request('assign_status') === 'activa' ? 'selected' : '' }}>Activas</option>
+                    <option value="devuelta" {{ request('assign_status') === 'devuelta' ? 'selected' : '' }}>Devueltas</option>
+                </select>
+                <select name="branch_id" class="form-control form-control-sm">
+                    <option value="">Todas las sucursales</option>
+                    @foreach($branches as $b)
+                        <option value="{{ $b->id }}" {{ request('branch_id') == $b->id ? 'selected' : '' }}>{{ $b->name }}</option>
+                    @endforeach
+                </select>
+            @endif
 
-                {{-- ── Log de movimientos ───────────────────────────── --}}
-                @if($tab === 'log')
-                    <div class="col-md-3 pr-1">
-                        <input type="text" name="collaborator" class="form-control form-control-sm"
-                               placeholder="Colaborador o cédula..."
-                               value="{{ request('collaborator') }}">
-                    </div>
-                    <div class="col-md-2 px-1">
-                        <select name="action" class="form-control form-control-sm auto-submit">
-                            <option value="">Todos los eventos</option>
-                            <option value="asignado" {{ request('action') === 'asignado' ? 'selected' : '' }}>Asignación</option>
-                            <option value="devuelto" {{ request('action') === 'devuelto' ? 'selected' : '' }}>Devolución</option>
-                        </select>
-                    </div>
-                    <div class="col-md-2 px-1">
-                        <select name="branch_id" class="form-control form-control-sm auto-submit">
-                            <option value="">Todas las sucursales</option>
-                            @foreach($branches as $b)
-                                <option value="{{ $b->id }}" {{ request('branch_id') == $b->id ? 'selected' : '' }}>
-                                    {{ $b->name }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="col-md-2 px-1">
-                        <div class="input-group input-group-sm">
-                            <div class="input-group-prepend">
-                                <span class="input-group-text bg-white" style="font-size:.7rem;">Desde</span>
-                            </div>
-                            <input type="date" name="from" class="form-control form-control-sm" value="{{ request('from') }}">
-                        </div>
-                    </div>
-                    <div class="col-md-2 px-1">
-                        <div class="input-group input-group-sm">
-                            <div class="input-group-prepend">
-                                <span class="input-group-text bg-white" style="font-size:.7rem;">Hasta</span>
-                            </div>
-                            <input type="date" name="to" class="form-control form-control-sm" value="{{ request('to') }}">
-                        </div>
-                    </div>
-                @endif
+            @if($tab === 'log')
+                <input type="text" name="collaborator" value="{{ request('collaborator') }}"
+                       class="form-control form-control-sm" placeholder="Colaborador">
+                <select name="action" class="form-control form-control-sm">
+                    <option value="">Todas las acciones</option>
+                    <option value="asignado" {{ request('action') === 'asignado' ? 'selected' : '' }}>Asignados</option>
+                    <option value="devuelto" {{ request('action') === 'devuelto' ? 'selected' : '' }}>Devueltos</option>
+                </select>
+                <select name="branch_id" class="form-control form-control-sm">
+                    <option value="">Todas las sucursales</option>
+                    @foreach($branches as $b)
+                        <option value="{{ $b->id }}" {{ request('branch_id') == $b->id ? 'selected' : '' }}>{{ $b->name }}</option>
+                    @endforeach
+                </select>
+            @endif
 
-                {{-- ── Acciones comunes: buscar / limpiar / exportar ── --}}
-                <div class="col-md-1 pl-1 {{ in_array($tab, ['ti','otros']) ? 'mt-1' : '' }}">
-                    <div class="d-flex" style="gap:.25rem;">
-                        <button type="submit" class="btn btn-sm btn-primary" title="Aplicar filtros">
-                            <i class="fas fa-filter"></i>
-                        </button>
-                        <a href="{{ route('audit.hub', ['tab' => $tab]) }}"
-                           class="btn btn-sm btn-outline-secondary" title="Limpiar filtros">
-                            <i class="fas fa-times"></i>
-                        </a>
-                    </div>
-                </div>
-
-                {{-- Exportar (mismos filtros actuales) --}}
-                @can('audit.export')
-                <div class="col-12 mt-2 d-flex justify-content-end">
-                    <a href="{{ route('audit.export', request()->all()) }}"
-                       class="btn btn-sm btn-success">
-                        <i class="fas fa-file-csv mr-1"></i>
-                        Exportar CSV (filtros aplicados)
-                    </a>
-                </div>
-                @endcan
-
-            </div>
+            <input type="date" name="from" value="{{ request('from') }}" class="form-control form-control-sm" title="Desde">
+            <input type="date" name="to" value="{{ request('to') }}" class="form-control form-control-sm" title="Hasta">
+            <button type="submit" class="btn btn-sm btn-primary"><i class="fas fa-filter mr-1"></i> Filtrar</button>
+            <a href="{{ route('audit.hub', ['tab' => $tab]) }}" class="btn btn-sm btn-outline-secondary">
+                <i class="fas fa-times mr-1"></i> Limpiar
+            </a>
         </form>
     </div>
 
-    {{-- ═══════════════════════════════════════════════════════
-         TABLA DE DATOS
-    ════════════════════════════════════════════════════════════ --}}
+    {{-- Resultados --}}
+    <div class="card-header py-2">
+        <small class="text-muted">{{ $data->total() }} registro(s) — Página {{ $data->currentPage() }} de {{ $data->lastPage() }}</small>
+    </div>
     <div class="card-body p-0">
 
-        @if($data->isEmpty())
-            <div class="text-center py-5 text-muted">
-                <i class="fas fa-inbox fa-3x mb-3 d-block" style="opacity:.25;"></i>
-                <p class="mb-1">No se encontraron resultados con los filtros aplicados.</p>
-                <a href="{{ route('audit.hub', ['tab' => $tab]) }}"
-                   class="btn btn-sm btn-outline-primary mt-2">
-                    <i class="fas fa-times mr-1"></i> Limpiar filtros
-                </a>
-            </div>
-        @else
-
-            {{-- ── Activos TI & Otros ───────────────────────────── --}}
-            @if(in_array($tab, ['ti', 'otros']))
-                <table class="table table-hover table-sm mb-0">
-                    <thead style="background:#f4f6f9;font-size:.78rem;text-transform:uppercase;">
-                        <tr>
-                            <th class="pl-3">Código</th>
-                            <th>Tipo</th>
-                            <th>Marca / Modelo</th>
-                            <th>Serial</th>
-                            <th>Estado</th>
-                            <th>Sucursal</th>
-                            <th>Propiedad</th>
-                            <th>Ingreso</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach($data as $a)
-                            <tr>
-                                <td class="pl-3 align-middle">
-                                    <code class="{{ $tab === 'ti' ? 'text-primary' : 'text-success' }}">
-                                        {{ $a->internal_code }}
-                                    </code>
-                                </td>
-                                <td class="align-middle">{{ $a->type?->name }}</td>
-                                <td class="align-middle">
-                                    {{ $a->brand }} {{ $a->model }}
-                                </td>
-                                <td class="align-middle"><small class="text-muted">{{ $a->serial }}</small></td>
-                                <td class="align-middle">
-                                    @if($a->status)
-                                        <span class="badge badge-pill"
-                                              style="background:{{ $a->status->color ?? '#6c757d' }};color:#fff;">
-                                            {{ $a->status->name }}
-                                        </span>
-                                    @endif
-                                </td>
-                                <td class="align-middle"><small>{{ $a->branch?->name }}</small></td>
-                                <td class="align-middle">
-                                    <small class="text-muted">{{ $a->property_type }}</small>
-                                </td>
-                                <td class="align-middle">
-                                    <small>{{ $a->created_at?->format('d/m/Y') }}</small>
-                                </td>
-                            </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            @endif
-
-            {{-- ── Préstamos ────────────────────────────────────── --}}
-            @if($tab === 'prestamos')
-                <table class="table table-hover table-sm mb-0">
-                    <thead style="background:#f4f6f9;font-size:.78rem;text-transform:uppercase;">
-                        <tr>
-                            <th class="pl-3">#</th>
-                            <th>Activo</th>
-                            <th>Colaborador</th>
-                            <th>Sucursal</th>
-                            <th>Inicio</th>
-                            <th>Vence</th>
-                            <th>Vigencia</th>
-                            <th>Estado</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach($data as $loan)
-                            @php
-                                $days = $loan->daysRemaining();
-                                $over = $days < 0;
-                                $barColor = $over ? '#dc3545' : ($days <= 2 ? '#fd7e14' : ($days <= 7 ? '#ffc107' : '#28a745'));
-                                $total = max(1, $loan->start_date->diffInDays($loan->end_date));
-                                $pct   = min(100, round($loan->start_date->diffInDays(now()) / $total * 100));
-                            @endphp
-                            <tr>
-                                <td class="pl-3 align-middle"><small>{{ $loan->id }}</small></td>
-                                <td class="align-middle">
-                                    <code class="text-primary">{{ $loan->asset?->internal_code }}</code>
-                                    <br><small class="text-muted">{{ $loan->asset?->type?->name }}</small>
-                                </td>
-                                <td class="align-middle">
-                                    {{ $loan->collaborator?->full_name }}
-                                    <br><small class="text-muted">{{ $loan->collaborator?->document }}</small>
-                                </td>
-                                <td class="align-middle"><small>{{ $loan->collaborator?->branch?->name }}</small></td>
-                                <td class="align-middle"><small>{{ $loan->start_date->format('d/m/Y') }}</small></td>
-                                <td class="align-middle"><small>{{ $loan->end_date->format('d/m/Y') }}</small></td>
-                                <td class="align-middle" style="min-width:110px;">
-                                    @if($loan->status === 'activo')
-                                        <div style="height:5px;background:#e9ecef;border-radius:3px;margin-bottom:2px;">
-                                            <div style="height:100%;width:{{ $pct }}%;background:{{ $barColor }};border-radius:3px;"></div>
-                                        </div>
-                                        <small style="color:{{ $barColor }};font-size:.7rem;">
-                                            {{ $over ? abs($days).'d vencido' : $days.'d restantes' }}
-                                        </small>
-                                    @else
-                                        <small class="text-muted">
-                                            {{ $loan->returned_at?->format('d/m/Y') }}
-                                        </small>
-                                    @endif
-                                </td>
-                                <td class="align-middle">
-                                    @php
-                                        $lc = match($loan->status) {
-                                            'activo'   => 'badge-primary',
-                                            'vencido'  => 'badge-danger',
-                                            'devuelto' => 'badge-secondary',
-                                            default    => 'badge-light',
-                                        };
-                                    @endphp
-                                    <span class="badge {{ $lc }}">{{ ucfirst($loan->status) }}</span>
-                                </td>
-                            </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            @endif
-
-            {{-- ── Asignaciones ─────────────────────────────────── --}}
-            @if($tab === 'asignaciones')
-                <table class="table table-hover table-sm mb-0">
-                    <thead style="background:#f4f6f9;font-size:.78rem;text-transform:uppercase;">
-                        <tr>
-                            <th class="pl-3">#</th>
-                            <th>Colaborador</th>
-                            <th>Sucursal</th>
-                            <th>Activos</th>
-                            <th>Modalidad</th>
-                            <th>Fecha</th>
-                            <th>Estado</th>
-                            <th>Registrado por</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach($data as $a)
-                            <tr>
-                                <td class="pl-3 align-middle">
-                                    <a href="{{ route('tech.assignments.show', $a) }}"
-                                       class="badge badge-light border text-dark">#{{ $a->id }}</a>
-                                </td>
-                                <td class="align-middle">
-                                    {{ $a->collaborator?->full_name }}
-                                    <br><small class="text-muted">{{ $a->collaborator?->document }}</small>
-                                </td>
-                                <td class="align-middle"><small>{{ $a->collaborator?->branch?->name }}</small></td>
-                                <td class="align-middle">
-                                    @foreach($a->assignmentAssets->take(3) as $aa)
-                                        <span class="badge badge-light border" style="font-size:.65rem;">
-                                            {{ $aa->asset?->internal_code }}
-                                        </span>
-                                    @endforeach
-                                    @if($a->assignmentAssets->count() > 3)
-                                        <small class="text-muted">+{{ $a->assignmentAssets->count()-3 }}</small>
-                                    @endif
-                                </td>
-                                <td class="align-middle">
-                                    @php
-                                        $mc = match($a->work_modality ?? 'presencial') {
-                                            'remoto'  => 'badge-info',
-                                            'hibrido' => 'badge-warning text-dark',
-                                            default   => 'badge-success',
-                                        };
-                                    @endphp
-                                    <span class="badge {{ $mc }}">{{ ucfirst($a->work_modality ?? 'presencial') }}</span>
-                                </td>
-                                <td class="align-middle"><small>{{ $a->assignment_date?->format('d/m/Y') }}</small></td>
-                                <td class="align-middle">
-                                    <span class="badge {{ $a->status === 'activa' ? 'badge-success' : 'badge-secondary' }}">
-                                        {{ ucfirst($a->status) }}
-                                    </span>
-                                </td>
-                                <td class="align-middle"><small>{{ $a->assignedBy?->name ?? '—' }}</small></td>
-                            </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            @endif
-
-            {{-- ── Log de movimientos ───────────────────────────── --}}
-            @if($tab === 'log')
-                <table class="table table-hover table-sm mb-0">
-                    <thead style="background:#f4f6f9;font-size:.78rem;text-transform:uppercase;">
-                        <tr>
-                            <th class="pl-3">Evento</th>
-                            <th>Activo</th>
-                            <th>Colaborador</th>
-                            <th>Sucursal</th>
-                            <th>Asig. #</th>
-                            <th>Fecha</th>
-                            <th>Devolución</th>
-                            <th>Devuelto por</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach($data as $aa)
-                            <tr>
-                                <td class="pl-3 align-middle">
-                                    @if($aa->returned_at)
-                                        <span class="badge badge-secondary">
-                                            <i class="fas fa-undo mr-1"></i>Devolución
-                                        </span>
-                                    @else
-                                        <span class="badge badge-primary">
-                                            <i class="fas fa-arrow-right mr-1"></i>Asignación
-                                        </span>
-                                    @endif
-                                </td>
-                                <td class="align-middle">
-                                    <code class="text-primary">{{ $aa->asset?->internal_code }}</code>
-                                    <br><small class="text-muted">{{ $aa->asset?->type?->name }}</small>
-                                </td>
-                                <td class="align-middle">
-                                    {{ $aa->assignment?->collaborator?->full_name }}
-                                    <br><small class="text-muted">{{ $aa->assignment?->collaborator?->document }}</small>
-                                </td>
-                                <td class="align-middle">
-                                    <small>{{ $aa->assignment?->collaborator?->branch?->name }}</small>
-                                </td>
-                                <td class="align-middle">
-                                    <a href="{{ route('tech.assignments.show', $aa->assignment_id) }}"
-                                       class="badge badge-light border text-dark">
-                                        #{{ $aa->assignment_id }}
-                                    </a>
-                                </td>
-                                <td class="align-middle">
-                                    <small>{{ $aa->created_at?->format('d/m/Y H:i') }}</small>
-                                </td>
-                                <td class="align-middle">
-                                    <small>{{ $aa->returned_at?->format('d/m/Y H:i') ?? '—' }}</small>
-                                </td>
-                                <td class="align-middle">
-                                    <small>{{ $aa->returnedBy?->name ?? '—' }}</small>
-                                </td>
-                            </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            @endif
-
+        {{-- Tab: TI / Otros --}}
+        @if(in_array($tab, ['ti', 'otros']))
+        <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0">
+                <thead class="thead-light" style="font-size:.72rem;text-transform:uppercase;">
+                    <tr>
+                        <th class="pl-3">Código</th>
+                        <th>Tipo</th>
+                        @if($tab === 'otros')<th>Subcategoría</th>@endif
+                        <th>Marca / Modelo</th>
+                        <th>Serial</th>
+                        <th>Estado</th>
+                        <th>Sucursal</th>
+                        <th>Propiedad</th>
+                        <th>Ingreso</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse($data as $asset)
+                    <tr>
+                        <td class="pl-3"><code style="font-size:.75rem;">{{ $asset->internal_code }}</code></td>
+                        <td><small>{{ $asset->type?->name ?? '—' }}</small></td>
+                        @if($tab === 'otros')
+                        <td>
+                            @if($asset->type?->subcategory)
+                                <span class="badge badge-light border" style="font-size:.65rem;">{{ $asset->type->subcategory }}</span>
+                            @else
+                                <span class="text-muted">—</span>
+                            @endif
+                        </td>
+                        @endif
+                        <td><small>{{ $asset->brand }} {{ $asset->model }}</small></td>
+                        <td><small class="text-muted">{{ $asset->serial ?? '—' }}</small></td>
+                        <td>
+                            @if($asset->status)
+                                <span class="badge badge-pill" style="background:{{ $asset->status->color ?? '#6c757d' }};color:#fff;font-size:.65rem;">
+                                    {{ $asset->status->name }}
+                                </span>
+                            @endif
+                        </td>
+                        <td><small>{{ $asset->branch?->name ?? '—' }}</small></td>
+                        <td><span class="badge badge-{{ $asset->property_type === 'PROPIO' ? 'success' : 'info' }}" style="font-size:.62rem;">{{ $asset->property_type }}</span></td>
+                        <td><small class="text-muted">{{ $asset->created_at?->format('d/m/Y') }}</small></td>
+                    </tr>
+                    @empty
+                    <tr>
+                        <td colspan="{{ $tab === 'otros' ? 9 : 8 }}" class="text-center text-muted py-4">
+                            <i class="fas fa-inbox fa-2x d-block mb-2" style="opacity:.2;"></i>
+                            No hay registros con los filtros aplicados.
+                        </td>
+                    </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
         @endif
-    </div>
 
-    {{-- Paginación --}}
+        {{-- Tab: Préstamos --}}
+        @if($tab === 'prestamos')
+        <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0">
+                <thead class="thead-light" style="font-size:.72rem;text-transform:uppercase;">
+                    <tr>
+                        <th class="pl-3">#</th>
+                        <th>Activo</th>
+                        <th>Tipo</th>
+                        <th>Colaborador</th>
+                        <th>Sucursal</th>
+                        <th>Inicio</th>
+                        <th>Vence</th>
+                        <th>Devuelto</th>
+                        <th>Estado</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse($data as $loan)
+                    <tr class="{{ $loan->status === 'vencido' ? 'table-warning' : '' }}">
+                        <td class="pl-3"><small>{{ $loan->id }}</small></td>
+                        <td><code style="font-size:.75rem;">{{ $loan->asset?->internal_code ?? '—' }}</code></td>
+                        <td><small>{{ $loan->asset?->type?->name ?? '—' }}</small></td>
+                        <td><small>{{ $loan->collaborator?->full_name ?? '—' }}</small></td>
+                        <td><small>{{ $loan->collaborator?->branch?->name ?? '—' }}</small></td>
+                        <td><small>{{ $loan->start_date?->format('d/m/Y') }}</small></td>
+                        <td><small>{{ $loan->end_date?->format('d/m/Y') }}</small></td>
+                        <td><small>{{ $loan->returned_at?->format('d/m/Y H:i') ?? '—' }}</small></td>
+                        <td>
+                            @php
+                                $lc = match($loan->status) { 'activo' => 'success', 'devuelto' => 'secondary', 'vencido' => 'danger', default => 'light' };
+                            @endphp
+                            <span class="badge badge-{{ $lc }}" style="font-size:.65rem;">{{ ucfirst($loan->status) }}</span>
+                        </td>
+                    </tr>
+                    @empty
+                    <tr><td colspan="9" class="text-center text-muted py-4">No hay préstamos.</td></tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+        @endif
+
+        {{-- Tab: Asignaciones --}}
+        @if($tab === 'asignaciones')
+        <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0">
+                <thead class="thead-light" style="font-size:.72rem;text-transform:uppercase;">
+                    <tr>
+                        <th class="pl-3">#</th>
+                        <th>Colaborador</th>
+                        <th>Sucursal</th>
+                        <th>Activos</th>
+                        <th>Fecha</th>
+                        <th>Estado</th>
+                        <th>Registrado por</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse($data as $asn)
+                    <tr>
+                        <td class="pl-3"><small>{{ $asn->id }}</small></td>
+                        <td><small class="font-weight-bold">{{ $asn->collaborator?->full_name ?? '—' }}</small></td>
+                        <td><small>{{ $asn->collaborator?->branch?->name ?? '—' }}</small></td>
+                        <td>
+                            <span class="badge badge-secondary" style="font-size:.65rem;">
+                                {{ $asn->assignmentAssets->count() }} activo(s)
+                            </span>
+                        </td>
+                        <td><small>{{ $asn->assignment_date?->format('d/m/Y') }}</small></td>
+                        <td>
+                            <span class="badge badge-{{ $asn->status === 'activa' ? 'success' : 'secondary' }}" style="font-size:.65rem;">
+                                {{ ucfirst($asn->status) }}
+                            </span>
+                        </td>
+                        <td><small class="text-muted">{{ $asn->assignedBy?->name ?? '—' }}</small></td>
+                    </tr>
+                    @empty
+                    <tr><td colspan="7" class="text-center text-muted py-4">No hay asignaciones.</td></tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+        @endif
+
+        {{-- Tab: Log de Movimientos --}}
+        @if($tab === 'log')
+        <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0">
+                <thead class="thead-light" style="font-size:.72rem;text-transform:uppercase;">
+                    <tr>
+                        <th class="pl-3">Activo</th>
+                        <th>Colaborador</th>
+                        <th>Sucursal</th>
+                        <th>Fecha Asig.</th>
+                        <th>Fecha Dev.</th>
+                        <th>Acción</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse($data as $aa)
+                    <tr>
+                        <td class="pl-3"><code style="font-size:.75rem;">{{ $aa->asset?->internal_code ?? '—' }}</code></td>
+                        <td><small>{{ $aa->assignment?->collaborator?->full_name ?? '—' }}</small></td>
+                        <td><small>{{ $aa->assignment?->collaborator?->branch?->name ?? '—' }}</small></td>
+                        <td><small>{{ $aa->assigned_at?->format('d/m/Y H:i') ?? $aa->created_at?->format('d/m/Y') }}</small></td>
+                        <td><small>{{ $aa->returned_at?->format('d/m/Y H:i') ?? '—' }}</small></td>
+                        <td>
+                            @if($aa->returned_at)
+                                <span class="badge badge-secondary" style="font-size:.65rem;"><i class="fas fa-undo mr-1"></i>Devuelto</span>
+                            @else
+                                <span class="badge badge-success" style="font-size:.65rem;"><i class="fas fa-check mr-1"></i>Asignado</span>
+                            @endif
+                        </td>
+                    </tr>
+                    @empty
+                    <tr><td colspan="6" class="text-center text-muted py-4">No hay movimientos.</td></tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+        @endif
+
+    </div>
     @if($data->hasPages())
-        <div class="card-footer py-2">
-            <div class="d-flex justify-content-between align-items-center">
-                <small class="text-muted">
-                    Mostrando {{ $data->firstItem() }}–{{ $data->lastItem() }}
-                    de <strong>{{ $data->total() }}</strong> registros
-                </small>
-                {{ $data->links() }}
-            </div>
-        </div>
-    @else
-        <div class="card-footer py-1">
-            <small class="text-muted">{{ $data->total() }} registro(s)</small>
-        </div>
+        <div class="card-footer">{{ $data->links() }}</div>
     @endif
 </div>
-
-@stop
-
-@section('css')
-<style>
-/* ── Chips de stats ───────────────────────────────────────── */
-.audit-chip {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: .4rem .9rem;
-    border: 1px solid #dee2e6;
-    border-radius: 8px;
-    background: #fff;
-    min-width: 80px;
-    text-align: center;
-}
-.audit-chip-num {
-    font-size: 1.2rem;
-    font-weight: 700;
-    line-height: 1;
-}
-.audit-chip-label {
-    font-size: .65rem;
-    color: #6c757d;
-    text-transform: uppercase;
-    letter-spacing: .4px;
-    margin-top: 2px;
-    white-space: nowrap;
-}
-</style>
-@stop
-
-@section('js')
-<script>
-// Auto-submit en selects con clase .auto-submit
-document.querySelectorAll('.auto-submit').forEach(el => {
-    el.addEventListener('change', () => document.getElementById('filterForm').submit());
-});
-
-// Debounce en inputs de texto
-let _t;
-document.querySelectorAll('#filterForm input[type="text"]').forEach(el => {
-    el.addEventListener('input', () => {
-        clearTimeout(_t);
-        _t = setTimeout(() => document.getElementById('filterForm').submit(), 400);
-    });
-});
-
-// Auto-submit en fechas
-document.querySelectorAll('#filterForm input[type="date"]').forEach(el => {
-    el.addEventListener('change', () => document.getElementById('filterForm').submit());
-});
-</script>
 @stop

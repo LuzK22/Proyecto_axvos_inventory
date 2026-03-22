@@ -1,99 +1,168 @@
 @extends('adminlte::page')
-
 @section('title', 'Reportes TI')
 
 @section('content_header')
-    <nav aria-label="breadcrumb">
-        <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">Dashboard</a></li>
-            <li class="breadcrumb-item"><span>Tecnología</span></li>
-            <li class="breadcrumb-item active">Reportes TI</li>
-        </ol>
-    </nav>
+<div class="d-flex justify-content-between align-items-center">
+    <div>
+        <h1 class="m-0 text-dark">
+            <i class="fas fa-chart-bar mr-2 text-primary"></i>Reportes — Activos TI
+        </h1>
+        <small class="text-muted">Inventario completo de activos tecnológicos</small>
+    </div>
+    <a href="{{ route('tech.assets.hub') }}" class="btn btn-sm btn-secondary">
+        <i class="fas fa-arrow-left mr-1"></i> Volver
+    </a>
+</div>
 @stop
 
 @section('content')
+@include('partials._alerts')
 
-<div class="card card-outline" style="border-top:none;border-right:none;border-bottom:none;border-left:4px solid #92400e;">
-    <div class="card-body pb-2">
-        <div class="d-flex align-items-center">
-            <div class="rounded d-flex align-items-center justify-content-center mr-3"
-                 style="width:52px;height:52px;background:#92400e;flex-shrink:0;">
-                <i class="fas fa-chart-bar fa-lg text-white"></i>
-            </div>
-            <div>
-                <h4 class="mb-0 font-weight-bold">Reportes TI</h4>
-                <p class="text-muted mb-0 small">Genere y exporte reportes del inventario tecnológico</p>
-            </div>
+{{-- Stats --}}
+<div class="row mb-3">
+    <div class="col-6 col-md-3">
+        <div class="small-box bg-primary">
+            <div class="inner"><h3>{{ $stats['total'] }}</h3><p>Total TI</p></div>
+            <div class="icon"><i class="fas fa-laptop"></i></div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="small-box bg-success">
+            <div class="inner"><h3>{{ $stats['asignados'] }}</h3><p>Asignados</p></div>
+            <div class="icon"><i class="fas fa-user-check"></i></div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="small-box bg-info">
+            <div class="inner"><h3>{{ $stats['disponibles'] }}</h3><p>Disponibles</p></div>
+            <div class="icon"><i class="fas fa-box-open"></i></div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="small-box bg-danger">
+            <div class="inner"><h3>{{ $stats['baja'] }}</h3><p>Dados de Baja</p></div>
+            <div class="icon"><i class="fas fa-ban"></i></div>
         </div>
     </div>
 </div>
 
-<div class="card shadow-sm">
-    <div class="card-body">
-        <p class="hub-section-title"><i class="fas fa-chart-bar mr-1"></i> Reportes</p>
-        <div class="row">
-
-            @can('tech.reports.view')
-            <div class="col-md-4 mb-3">
-                <a href="{{ route('tech.reports.index') }}" class="hub-btn"
-                   style="background:linear-gradient(135deg,#92400e,#b45309);">
-                    <div class="hub-btn-icon"><i class="fas fa-chart-pie"></i></div>
-                    <div class="hub-btn-text">
-                        <strong>Reportes TI</strong>
-                        <small>Reportes filtrables</small>
-                    </div>
+{{-- Filtros --}}
+<div class="card shadow-sm mb-3">
+    <div class="card-body py-2">
+        <form method="GET" class="form-inline flex-wrap" style="gap:8px;">
+            <input type="text" name="q" value="{{ request('q') }}"
+                   class="form-control form-control-sm" placeholder="Buscar código, marca, modelo, serial..."
+                   style="min-width:220px;">
+            <select name="type_id" class="form-control form-control-sm">
+                <option value="">Todos los tipos</option>
+                @foreach($types as $t)
+                    <option value="{{ $t->id }}" {{ request('type_id') == $t->id ? 'selected' : '' }}>{{ $t->name }}</option>
+                @endforeach
+            </select>
+            <select name="status_id" class="form-control form-control-sm">
+                <option value="">Todos los estados</option>
+                @foreach($statuses as $s)
+                    <option value="{{ $s->id }}" {{ request('status_id') == $s->id ? 'selected' : '' }}>{{ $s->name }}</option>
+                @endforeach
+            </select>
+            <select name="branch_id" class="form-control form-control-sm">
+                <option value="">Todas las sucursales</option>
+                @foreach($branches as $b)
+                    <option value="{{ $b->id }}" {{ request('branch_id') == $b->id ? 'selected' : '' }}>{{ $b->name }}</option>
+                @endforeach
+            </select>
+            <button type="submit" class="btn btn-sm btn-primary">
+                <i class="fas fa-filter mr-1"></i> Filtrar
+            </button>
+            @if(request()->hasAny(['q','type_id','status_id','branch_id']))
+                <a href="{{ route('tech.reports.index') }}" class="btn btn-sm btn-outline-secondary">
+                    <i class="fas fa-times mr-1"></i> Limpiar
                 </a>
-            </div>
-            @endcan
-
-            <div class="col-md-4 mb-3">
-                <div class="hub-btn hub-btn-soon">
-                    <div class="hub-btn-icon"><i class="fas fa-file-excel"></i></div>
-                    <div class="hub-btn-text"><strong>Exportar a Excel</strong><small>Descargar inventario</small></div>
-                    <span class="hub-soon-badge">Próximamente</span>
-                </div>
-            </div>
-
-        </div>
+            @endif
+        </form>
     </div>
 </div>
 
+{{-- Quick export links --}}
+<div class="mb-3 d-flex" style="gap:8px;">
+    <a href="{{ route('tech.reports.export', request()->all()) }}" class="btn btn-sm btn-outline-success">
+        <i class="fas fa-file-csv mr-1"></i> Exportar TI completo
+    </a>
+    <a href="{{ route('reports.collaborators.export') }}" class="btn btn-sm btn-outline-info">
+        <i class="fas fa-users mr-1"></i> Reporte colaboradores con activos
+    </a>
+</div>
+
+{{-- Tabla --}}
 <div class="card shadow-sm">
-    <div class="card-body">
-        <p class="hub-section-title"><i class="fas fa-filter mr-1"></i> Por Dimensión</p>
-        <div class="row">
-
-            <div class="col-md-4 mb-3">
-                <div class="hub-btn hub-btn-soon">
-                    <div class="hub-btn-icon"><i class="fas fa-building"></i></div>
-                    <div class="hub-btn-text"><strong>Por Sucursal</strong><small>Activos por sede</small></div>
-                    <span class="hub-soon-badge">Próximamente</span>
-                </div>
-            </div>
-
-            <div class="col-md-4 mb-3">
-                <div class="hub-btn hub-btn-soon">
-                    <div class="hub-btn-icon"><i class="fas fa-sitemap"></i></div>
-                    <div class="hub-btn-text"><strong>Por Área</strong><small>Activos por departamento</small></div>
-                    <span class="hub-soon-badge">Próximamente</span>
-                </div>
-            </div>
-
-            <div class="col-md-4 mb-3">
-                <div class="hub-btn hub-btn-soon">
-                    <div class="hub-btn-icon"><i class="fas fa-tasks"></i></div>
-                    <div class="hub-btn-text"><strong>Por Estado</strong><small>Activos por condición</small></div>
-                    <span class="hub-soon-badge">Próximamente</span>
-                </div>
-            </div>
-
+    <div class="card-header py-2 d-flex justify-content-between align-items-center">
+        <span class="font-weight-bold" style="font-size:.9rem;">
+            <i class="fas fa-table mr-1 text-muted"></i>
+            {{ $assets->total() }} activo(s) encontrado(s)
+        </span>
+        <a href="{{ route('tech.reports.export', request()->all()) }}" class="btn btn-sm btn-success">
+            <i class="fas fa-file-csv mr-1"></i> Exportar Excel
+        </a>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0">
+                <thead class="thead-light" style="font-size:.75rem;text-transform:uppercase;">
+                    <tr>
+                        <th class="pl-3">Código</th>
+                        <th>Tipo</th>
+                        <th>Marca / Modelo</th>
+                        <th>Serial</th>
+                        <th>Estado</th>
+                        <th>Sucursal</th>
+                        <th>Propiedad</th>
+                        <th>Ingreso</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse($assets as $asset)
+                    <tr>
+                        <td class="pl-3"><code style="font-size:.78rem;">{{ $asset->internal_code }}</code></td>
+                        <td><small>{{ $asset->type?->name ?? '—' }}</small></td>
+                        <td><small>{{ $asset->brand }} {{ $asset->model }}</small></td>
+                        <td><small class="text-muted">{{ $asset->serial ?? '—' }}</small></td>
+                        <td>
+                            @if($asset->status)
+                                <span class="badge badge-pill" style="background:{{ $asset->status->color ?? '#6c757d' }};color:#fff;font-size:.68rem;">
+                                    {{ $asset->status->name }}
+                                </span>
+                            @else
+                                <span class="text-muted">—</span>
+                            @endif
+                        </td>
+                        <td><small>{{ $asset->branch?->name ?? '—' }}</small></td>
+                        <td>
+                            <span class="badge badge-{{ $asset->property_type === 'PROPIO' ? 'success' : 'info' }}" style="font-size:.65rem;">
+                                {{ $asset->property_type }}
+                            </span>
+                        </td>
+                        <td><small class="text-muted">{{ $asset->created_at?->format('d/m/Y') }}</small></td>
+                        <td>
+                            <a href="{{ route('tech.assets.show', $asset) }}" class="btn btn-xs btn-outline-secondary">
+                                <i class="fas fa-eye"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    @empty
+                    <tr>
+                        <td colspan="9" class="text-center text-muted py-4">
+                            <i class="fas fa-inbox fa-2x d-block mb-2" style="opacity:.2;"></i>
+                            No se encontraron activos TI con los filtros aplicados.
+                        </td>
+                    </tr>
+                    @endforelse
+                </tbody>
+            </table>
         </div>
     </div>
+    @if($assets->hasPages())
+        <div class="card-footer">{{ $assets->links() }}</div>
+    @endif
 </div>
-
-@stop
-
-@section('css')
-@include('partials.hub-css')
 @stop

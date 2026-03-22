@@ -11,9 +11,10 @@ class AssetType extends Model
     
     protected $fillable = [
         'name',
-        'code',         // "POR" (corto)
-        'category', // "TI", "MUEBLE"
-        'prefix',    // "TI-POR" ← SE GUARDA AQUÍ 
+        'code',         // Código corto de 3 letras — ej: "POR", "SIL"
+        'category',     // "TI" | "OTRO"
+        'subcategory',  // Solo OTRO — ej: "Mobiliario", "Enseres", "Redes" (nullable)
+        'prefix',       // Prefijo completo — ej: "TI-POR", "OTRO-SIL" (generado automáticamente)
         'active',
         'created_by',
     ];

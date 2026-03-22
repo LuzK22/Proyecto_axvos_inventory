@@ -25,6 +25,17 @@ class AssignmentTemplatesSeeder extends Seeder
 {
     public function run(): void
     {
+        // ── Asegurar que exista Hub USB como tipo de activo TI ────────────
+        $hubUsb = AssetType::firstOrCreate(
+            ['category' => 'TI', 'name' => 'Hub USB'],
+            [
+                'code'        => 'TI-HUB',
+                'prefix'      => 'TI-HUB',
+                'subcategory' => 'Periféricos',
+                'active'      => true,
+            ]
+        );
+
         // ── Tipo: Por Modalidad de Trabajo (AXVOS) ───────────────────────
         $type = AssignmentType::firstOrCreate(
             ['name' => 'Por Modalidad de Trabajo'],
@@ -38,9 +49,22 @@ class AssignmentTemplatesSeeder extends Seeder
             ]
         );
 
+        // ── Tipo: Por Rol / Cargo ─────────────────────────────────────────
+        $typeRol = AssignmentType::firstOrCreate(
+            ['name' => 'Por Rol / Cargo'],
+            [
+                'trigger_field'   => 'destination_type',
+                'trigger_label'   => 'Tipo de Destino',
+                'target'          => 'person',
+                'requires_return' => true,
+                'active'          => true,
+                'sort_order'      => 2,
+            ]
+        );
+
         // IDs de tipos de activo TI
         $tipos = AssetType::where('category', 'TI')
-            ->whereIn('name', ['Portátil', 'Monitor', 'Mouse', 'Teclado', 'Diadema', 'Cargador'])
+            ->whereIn('name', ['Portátil', 'Monitor', 'Mouse', 'Teclado', 'Diadema', 'Cargador', 'Hub USB'])
             ->pluck('id', 'name');
 
         // ── Plantilla: Trabajo Remoto ─────────────────────────────────────
@@ -81,10 +105,11 @@ class AssignmentTemplatesSeeder extends Seeder
         $this->createItems($presencial->id, [
             ['name' => 'Portátil', 'goes_to' => 'assignee', 'qty' => 1],
             ['name' => 'Monitor',  'goes_to' => 'assignee', 'qty' => 1],
-            ['name' => 'Teclado',  'goes_to' => 'assignee', 'qty' => 1],
-            ['name' => 'Mouse',    'goes_to' => 'assignee', 'qty' => 1],
+            ['name' => 'Teclado',  'goes_to' => 'assignee', 'qty' => 1, 'notes' => 'Puede ser inalámbrico'],
+            ['name' => 'Mouse',    'goes_to' => 'assignee', 'qty' => 1, 'notes' => 'Puede ser inalámbrico'],
             ['name' => 'Diadema',  'goes_to' => 'assignee', 'qty' => 1],
             ['name' => 'Cargador', 'goes_to' => 'assignee', 'qty' => 1],
+            ['name' => 'Hub USB',  'goes_to' => 'assignee', 'qty' => 1],
         ], $tipos);
 
         // ── Plantilla: Trabajo Mixto ──────────────────────────────────────
@@ -110,7 +135,80 @@ class AssignmentTemplatesSeeder extends Seeder
             ['name' => 'Mouse',     'goes_to' => 'area',     'qty' => 1, 'notes' => 'Área compartida de oficina'],
         ], $tipos);
 
-        $this->command->info('Plantillas de asignación AXVOS creadas: Trabajo Remoto, Presencial, Mixto');
+        // ── Plantilla: Jefe / Responsable de Área ────────────────────────
+        $jefe = AssignmentTemplate::firstOrCreate(
+            ['assignment_type_id' => $typeRol->id, 'trigger_value' => 'jefe'],
+            [
+                'name'        => 'Jefe / Responsable de Área',
+                'description' => 'Equipo completo para jefe de área: portátil, cargador, diadema y periféricos inalámbricos.',
+                'active'      => true,
+                'sort_order'  => 1,
+            ]
+        );
+
+        $jefe->items()->delete();
+        $this->createItems($jefe->id, [
+            ['name' => 'Portátil', 'goes_to' => 'jefe', 'qty' => 1, 'notes' => 'Equipo principal'],
+            ['name' => 'Cargador', 'goes_to' => 'jefe', 'qty' => 1],
+            ['name' => 'Diadema',  'goes_to' => 'jefe', 'qty' => 1, 'notes' => 'Para reuniones'],
+            ['name' => 'Teclado',  'goes_to' => 'jefe', 'qty' => 1, 'notes' => 'Inalámbrico'],
+            ['name' => 'Mouse',    'goes_to' => 'jefe', 'qty' => 1, 'notes' => 'Inalámbrico'],
+            ['name' => 'Monitor',  'goes_to' => 'jefe', 'qty' => 1, 'notes' => 'Monitor de escritorio'],
+        ], $tipos);
+
+        // ── Tipo: Dotación de Mobiliario (OTRO) ──────────────────────────
+        $typeOtro = AssignmentType::firstOrCreate(
+            ['name' => 'Dotación de Mobiliario'],
+            [
+                'trigger_field'   => 'destination_type',
+                'trigger_label'   => 'Tipo de Destino',
+                'target'          => 'area',
+                'requires_return' => false,
+                'active'          => true,
+                'sort_order'      => 3,
+            ]
+        );
+
+        $tiposOtro = \App\Models\AssetType::where('category', 'OTRO')
+            ->whereIn('name', ['Silla', 'Mesa/Escritorio', 'Archivador', 'Proyector', 'Teléfono Fijo'])
+            ->pluck('id', 'name');
+
+        // ── Plantilla: Puesto de Trabajo ──────────────────────────────────
+        $puesto = AssignmentTemplate::firstOrCreate(
+            ['assignment_type_id' => $typeOtro->id, 'trigger_value' => 'collaborator'],
+            [
+                'name'        => 'Puesto de Trabajo',
+                'description' => 'Dotación estándar de mobiliario para un puesto de trabajo individual.',
+                'active'      => true,
+                'sort_order'  => 1,
+            ]
+        );
+
+        $puesto->items()->delete();
+        $this->createItems($puesto->id, [
+            ['name' => 'Silla',         'goes_to' => 'assignee', 'qty' => 1],
+            ['name' => 'Mesa/Escritorio','goes_to' => 'assignee', 'qty' => 1],
+        ], $tiposOtro);
+
+        // ── Plantilla: Oficina Jefe de Área ───────────────────────────────
+        $oficJefe = AssignmentTemplate::firstOrCreate(
+            ['assignment_type_id' => $typeOtro->id, 'trigger_value' => 'jefe'],
+            [
+                'name'        => 'Oficina Jefe de Área',
+                'description' => 'Dotación para oficina de jefe: escritorio, silla ejecutiva y archivador.',
+                'active'      => true,
+                'sort_order'  => 2,
+            ]
+        );
+
+        $oficJefe->items()->delete();
+        $this->createItems($oficJefe->id, [
+            ['name' => 'Silla',          'goes_to' => 'jefe', 'qty' => 1, 'notes' => 'Silla ejecutiva'],
+            ['name' => 'Mesa/Escritorio','goes_to' => 'jefe', 'qty' => 1],
+            ['name' => 'Archivador',     'goes_to' => 'jefe', 'qty' => 1],
+        ], $tiposOtro);
+
+        $this->command->info('Plantillas de asignación AXVOS creadas: Remoto, Presencial, Mixto, Jefe TI, Puesto de Trabajo, Oficina Jefe');
     }
 
     private function createItems(int $templateId, array $items, $tipos): void

@@ -230,6 +230,73 @@ body.login-page {
     opacity: 0.15;
 }
 
+/* ── AXI Floating Chat Button ───────────────────────────────────── */
+/*
+ * Botón flotante del asistente AXI (esquina inferior derecha).
+ * Usa la imagen axi-face.png (Imagen B — solo la cara del robot).
+ * Actualmente en estado "próximamente" — se activará al integrar la IA.
+ */
+#axi-float-btn {
+    position: fixed;
+    bottom: 28px;
+    right: 28px;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #0d1b2a, #1a2d4a);
+    border: 2px solid #00b4d8;
+    box-shadow: 0 4px 20px rgba(0,180,216,0.4);
+    cursor: pointer;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform .2s, box-shadow .2s;
+    overflow: hidden;
+    text-decoration: none;
+}
+#axi-float-btn:hover {
+    transform: scale(1.1) translateY(-3px);
+    box-shadow: 0 8px 28px rgba(0,180,216,0.55);
+}
+#axi-float-btn img {
+    width: 48px;
+    height: 48px;
+    object-fit: contain;
+    border-radius: 50%;
+}
+/* Badge "nuevo" / pulso en el botón flotante */
+#axi-float-btn::after {
+    content: '';
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 10px;
+    height: 10px;
+    background: #00b4d8;
+    border-radius: 50%;
+    border: 2px solid #0d1b2a;
+    animation: axiPulse 2s infinite;
+}
+@keyframes axiPulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%       { opacity: .6; transform: scale(1.3); }
+}
+/* Tooltip sobre el botón flotante */
+#axi-float-btn[title]:hover::before {
+    content: attr(title);
+    position: absolute;
+    right: 68px;
+    background: #0d1b2a;
+    color: #00b4d8;
+    font-size: .72rem;
+    padding: 4px 10px;
+    border-radius: 8px;
+    white-space: nowrap;
+    border: 1px solid rgba(0,180,216,.3);
+    pointer-events: none;
+}
+
 /* ── Contenedor de tabla con scroll vertical ────────────────────── */
 /* Usar class="table-scroll-container" en el div que envuelve la tabla */
 .table-scroll-container {

@@ -63,7 +63,11 @@
                 <thead class="thead-light">
                     <tr>
                         <th>Nombre</th>
-                        <th style="width:100px;">Código</th>
+                        {{-- Subcategoría solo aplica a OTRO --}}
+                        @if($category === 'OTRO')
+                            <th style="width:150px;">Subcategoría</th>
+                        @endif
+                        <th style="width:130px;">Código / Prefijo</th>
                         <th style="width:140px;">Creado por</th>
                         <th style="width:90px;">Estado</th>
                         <th style="width:60px;"></th>
@@ -73,7 +77,20 @@
                     @foreach($types as $type)
                     <tr>
                         <td class="font-weight-bold">{{ $type->name }}</td>
-                        <td><code>{{ $type->code }}</code></td>
+                        @if($category === 'OTRO')
+                            <td>
+                                @if($type->subcategory)
+                                    <span class="badge badge-light border text-muted" style="font-size:.75rem;">
+                                        {{ $type->subcategory }}
+                                    </span>
+                                @else
+                                    <span class="text-muted">—</span>
+                                @endif
+                            </td>
+                        @endif
+                        <td>
+                            <code style="font-size:.78rem;">{{ $type->prefix ?? $type->code }}</code>
+                        </td>
                         <td class="text-muted small">{{ $type->creator->name ?? '-' }}</td>
                         <td>
                             <span class="badge badge-pill {{ $type->active ? 'badge-success' : 'badge-secondary' }}">

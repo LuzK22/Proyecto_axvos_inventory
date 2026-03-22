@@ -50,10 +50,32 @@
                     <div class="form-group">
                         <label class="font-weight-bold">Nombre <span class="text-danger">*</span></label>
                         <input type="text" name="name" class="form-control"
-                               placeholder="Ej: Portátil, Monitor, Silla Ergonómica..."
+                               placeholder="{{ $category === 'TI' ? 'Ej: Portátil, Monitor, Teclado...' : 'Ej: Silla Ergonómica, Escritorio, Nevera...' }}"
                                value="{{ old('name') }}" required autofocus>
-                        <small class="text-muted">El código interno se genera automáticamente.</small>
+                        <small class="text-muted">El código interno (3 letras) se genera automáticamente.</small>
                     </div>
+
+                    {{-- Subcategoría: solo visible para Otros Activos --}}
+                    @if($category === 'OTRO')
+                    <div class="form-group">
+                        <label class="font-weight-bold">Subcategoría</label>
+                        <input type="text" name="subcategory" class="form-control"
+                               placeholder="Ej: Mobiliario, Enseres, Redes, Electrodomésticos..."
+                               value="{{ old('subcategory') }}"
+                               list="subcategoryList">
+                        {{-- Sugerencias predefinidas de subcategorías comunes --}}
+                        <datalist id="subcategoryList">
+                            <option value="Mobiliario">
+                            <option value="Enseres">
+                            <option value="Electrodomésticos">
+                            <option value="Redes y Conectividad">
+                            <option value="Seguridad">
+                            <option value="Transporte">
+                            <option value="Herramientas">
+                        </datalist>
+                        <small class="text-muted">Agrupa tipos similares. Ej: Silla y Escritorio → subcategoría "Mobiliario".</small>
+                    </div>
+                    @endif
 
                     <div class="d-flex justify-content-between align-items-center mt-4">
                         @if($category === 'TI')

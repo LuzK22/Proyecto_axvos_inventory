@@ -209,24 +209,6 @@
                     </a>
                 @endif
 
-                <form method="POST" action="{{ route('actas.excel.final.upload', $acta) }}" enctype="multipart/form-data">
-                    @csrf
-                    <small class="text-muted d-block mb-2">Subida manual opcional, solo como respaldo.</small>
-                    <div class="custom-file mb-2">
-                        <input type="file" class="custom-file-input" id="excel_final" name="excel_final" accept=".xlsx" required {{ in_array($acta->status, [\App\Models\Acta::STATUS_COMPLETADA, \App\Models\Acta::STATUS_ANULADA]) ? 'disabled' : '' }}>
-                        <label class="custom-file-label" for="excel_final">Subir Excel final...</label>
-                    </div>
-                    <button class="btn btn-sm btn-outline-primary btn-block" {{ in_array($acta->status, [\App\Models\Acta::STATUS_COMPLETADA, \App\Models\Acta::STATUS_ANULADA]) ? 'disabled' : '' }}>
-                        <i class="fas fa-upload mr-1"></i> Guardar Excel final
-                    </button>
-                </form>
-
-                @if($acta->xlsx_final_path)
-                    <a href="{{ route('actas.excel.final.download', $acta) }}" class="btn btn-sm btn-outline-primary btn-block mt-2">
-                        <i class="fas fa-download mr-1"></i> Descargar Excel final
-                    </a>
-                @endif
-
                 <hr class="my-2">
                 <form method="POST" action="{{ route('actas.pdf.final.generate', $acta) }}">
                     @csrf

@@ -12,12 +12,13 @@ class Assignment extends Model
     protected $fillable = [
         'collaborator_id',
         'area_id',
-        'asset_category',
+        'destination_type',  // collaborator | jefe | area | pool
+        'asset_category',    // TI | OTRO
         'assigned_by',
         'assignment_date',
-        'work_modality',
+        'work_modality',     // presencial | remoto | hibrido
         'notes',
-        'status',
+        'status',            // activa | devuelta | parcial
     ];
 
     protected $casts = [
@@ -37,14 +38,45 @@ class Assignment extends Model
     }
 
     /**
-     * Nombre del destinatario (colaborador o área)
+     * Etiqueta legible del tipo de destino
+     */
+    public static function destinationLabel(string $type): string
+    {
+        return match($type) {
+            'collaborator' => 'Colaborador',
+            'jefe'         => 'Jefe / Responsable de Área',
+            'area'         => 'Área Compartida',
+            'pool'         => 'Pool Compartido',
+            default        => 'Colaborador',
+        };
+    }
+
+    /**
+     * Nombre del destinatario según el tipo de destino
      */
     public function getRecipientNameAttribute(): string
     {
-        if ($this->collaborator_id) {
-            return $this->collaborator?->full_name ?? '—';
-        }
-        return 'Área: ' . ($this->area?->name ?? '—');
+        return match($this->destination_type) {
+            'collaborator' => $this->collaborator?->full_name ?? '—',
+            'jefe'         => 'Jefe: ' . ($this->collaborator?->full_name ?? '—'),
+            'area'         => 'Área: ' . ($this->area?->name ?? '—'),
+            'pool'         => 'Pool compartido' . ($this->area ? ' — ' . $this->area->name : ''),
+            default        => $this->collaborator?->full_name ?? '—',
+        };
+    }
+
+    /**
+     * Ícono FontAwesome para el tipo de destino
+     */
+    public function getDestinationIconAttribute(): string
+    {
+        return match($this->destination_type) {
+            'collaborator' => 'fa-user',
+            'jefe'         => 'fa-user-tie',
+            'area'         => 'fa-map-marker-alt',
+            'pool'         => 'fa-sync-alt',
+            default        => 'fa-user',
+        };
     }
 
     public function actas()

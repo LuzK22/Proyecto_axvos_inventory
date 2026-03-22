@@ -53,9 +53,30 @@
                                value="{{ old('name', $assetType->name) }}" required autofocus>
                     </div>
 
+                    {{-- Subcategoría: solo para Otros Activos --}}
+                    @if($assetType->category === 'OTRO')
+                    <div class="form-group">
+                        <label class="font-weight-bold">Subcategoría</label>
+                        <input type="text" name="subcategory" class="form-control"
+                               placeholder="Ej: Mobiliario, Enseres, Electrodomésticos..."
+                               value="{{ old('subcategory', $assetType->subcategory) }}"
+                               list="subcategoryList">
+                        <datalist id="subcategoryList">
+                            <option value="Mobiliario">
+                            <option value="Enseres">
+                            <option value="Electrodomésticos">
+                            <option value="Redes y Conectividad">
+                            <option value="Seguridad">
+                            <option value="Transporte">
+                            <option value="Herramientas">
+                        </datalist>
+                        <small class="text-muted">Agrupa tipos similares bajo una misma categoría.</small>
+                    </div>
+                    @endif
+
                     <div class="form-group mb-0">
-                        <label class="font-weight-bold">Código interno</label>
-                        <input type="text" class="form-control" value="{{ $assetType->code }}" disabled>
+                        <label class="font-weight-bold">Código interno generado</label>
+                        <input type="text" class="form-control bg-light" value="{{ $assetType->prefix ?? $assetType->code }}" disabled>
                         <small class="text-muted">El código no puede modificarse.</small>
                     </div>
 

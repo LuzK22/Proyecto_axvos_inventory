@@ -198,13 +198,193 @@ class AssetController extends Controller
     public function history()   { return view('tech.history.index'); }
     public function disposals() { return view('tech.disposals.hub'); }
 
-    // Activos de categoría OTRO (muebles, equipos de oficina, etc.)
-    public function assetsIndex()
+    /* =========================================================
+     | OTROS ACTIVOS — LISTADO
+     ========================================================= */
+    public function assetsIndex(Request $request)
     {
-        $assets = Asset::whereHas('type', fn($q) => $q->where('category', 'OTRO'))
-            ->with(['type','branch','status'])
+        $query = Asset::with(['type', 'branch', 'status'])
+            ->whereHas('type', fn($q) => $q->where('category', 'OTRO'));
+
+        // Búsqueda por texto libre
+        if ($q = $request->input('q')) {
+            $query->where(function ($sub) use ($q) {
+                $sub->where('internal_code', 'like', "%{$q}%")
+                    ->orWhere('serial',       'like', "%{$q}%")
+                    ->orWhere('brand',        'like', "%{$q}%")
+                    ->orWhere('model',        'like', "%{$q}%")
+                    ->orWhere('asset_tag',    'like', "%{$q}%");
+            });
+        }
+
+        // Filtro por estado
+        if ($status = $request->input('status')) {
+            $query->whereHas('status', fn($s) => $s->where('name', $status));
+        }
+
+        // Filtro por sucursal
+        if ($branch = $request->input('branch')) {
+            $query->where('branch_id', $branch);
+        }
+
+        // Filtro por subcategoría (tipo agrupado)
+        if ($subcategory = $request->input('subcategory')) {
+            $query->whereHas('type', fn($t) => $t->where('subcategory', $subcategory));
+        }
+
+        $assets       = $query->orderBy('id', 'desc')->get();
+        $branches     = Branch::where('active', true)->orderBy('name')->get();
+        $statuses     = Status::orderBy('name')->get();
+        // Subcategorías únicas disponibles para el filtro
+        $subcategories = AssetType::where('category', 'OTRO')
+            ->whereNotNull('subcategory')
+            ->distinct()->pluck('subcategory')->sort()->values();
+
+        return view('assets.index', compact('assets', 'branches', 'statuses', 'subcategories'));
+    }
+
+    /* =========================================================
+     | OTROS ACTIVOS — CREAR
+     ========================================================= */
+    public function assetsCreate()
+    {
+        // Solo tipos activos de categoría OTRO
+        $types    = AssetType::where('category', 'OTRO')->where('active', true)
+                        ->orderBy('subcategory')->orderBy('name')->get();
+        $branches = Branch::where('active', true)->orderBy('name')->get();
+
+        return view('assets.create', compact('types', 'branches'));
+    }
+
+    /* =========================================================
+     | OTROS ACTIVOS — GUARDAR
+     ========================================================= */
+    public function assetsStore(Request $request)
+    {
+        // Reutilizamos las mismas reglas de validación que TI
+        // Diferencia: serial puede ser nullable para algunos activos OTRO (ej: silla)
+        $rules = $this->validationRules();
+        $rules['serial'] = 'nullable|string|max:100|unique:assets,serial';
+
+        $request->validate($rules);
+
+        $type = AssetType::findOrFail($request->asset_type_id);
+
+        // Generar código secuencial: OTRO-SIL-00001
+        $lastAsset = Asset::where('asset_type_id', $type->id)
+            ->whereNotNull('internal_code')
+            ->orderBy('id', 'desc')
+            ->first();
+
+        $lastNumber = 0;
+        if ($lastAsset?->internal_code) {
+            preg_match('/(\d+)$/', $lastAsset->internal_code, $matches);
+            $lastNumber = (int) ($matches[1] ?? 0);
+        }
+
+        $internalCode    = $type->generateAssetCode($lastNumber + 1);
+        $availableStatus = Status::where('name', 'Disponible')->firstOrFail();
+
+        Asset::create([
+            'internal_code'    => $internalCode,
+            'asset_type_id'    => $type->id,
+            'brand'            => $request->brand,
+            'model'            => $request->model,
+            'serial'           => $request->serial,
+            'asset_tag'        => $request->asset_tag,
+            'fixed_asset_code' => $request->fixed_asset_code,
+            'property_type'    => $request->property_type,
+            'purchase_value'   => $request->purchase_value,
+            'purchase_date'    => $request->purchase_date,
+            'provider_name'    => $request->provider_name,
+            'status_id'        => $availableStatus->id,
+            'branch_id'        => $request->branch_id,
+            'observations'     => $request->observations,
+        ]);
+
+        return redirect()
+            ->route('assets.index')
+            ->with('success', "Activo <strong>{$internalCode}</strong> registrado correctamente.");
+    }
+
+    /* =========================================================
+     | OTROS ACTIVOS — DETALLE
+     ========================================================= */
+    public function assetsShow(Asset $asset)
+    {
+        // Verificar que pertenece a OTRO
+        abort_unless($asset->type?->category === 'OTRO', 404);
+
+        $asset->load(['type', 'branch', 'status', 'events.user', 'events.collaborator']);
+
+        // Asignación activa
+        $currentAssignment = $asset->currentAssignmentAsset?->load(
+            'assignment.collaborator',
+            'assignment.area'
+        );
+
+        // Historial completo de asignaciones
+        $assignmentHistory = $asset->assignmentAssets()
+            ->with(['assignment.collaborator', 'assignment.area', 'returnedBy'])
+            ->orderBy('assigned_at', 'desc')
             ->get();
-        return view('assets.index', compact('assets'));
+
+        $pendingDeletion = DeletionRequest::where('asset_id', $asset->id)
+            ->where('status', 'pending')
+            ->first();
+
+        $branches = Branch::where('active', true)->orderBy('name')->get();
+
+        return view('assets.show', compact(
+            'asset', 'currentAssignment', 'assignmentHistory',
+            'pendingDeletion', 'branches'
+        ));
+    }
+
+    /* =========================================================
+     | OTROS ACTIVOS — EDITAR
+     ========================================================= */
+    public function assetsEdit(Asset $asset)
+    {
+        abort_unless($asset->type?->category === 'OTRO', 404);
+
+        $types    = AssetType::where('category', 'OTRO')->where('active', true)
+                        ->orderBy('subcategory')->orderBy('name')->get();
+        $branches = Branch::where('active', true)->orderBy('name')->get();
+
+        return view('assets.edit', compact('asset', 'types', 'branches'));
+    }
+
+    /* =========================================================
+     | OTROS ACTIVOS — ACTUALIZAR
+     ========================================================= */
+    public function assetsUpdate(Request $request, Asset $asset)
+    {
+        abort_unless($asset->type?->category === 'OTRO', 404);
+
+        $rules = $this->validationRules($asset->id);
+        $rules['serial'] = 'nullable|string|max:100|unique:assets,serial,' . $asset->id;
+
+        $request->validate($rules);
+
+        $asset->update([
+            'asset_type_id'    => $request->asset_type_id,
+            'brand'            => $request->brand,
+            'model'            => $request->model,
+            'serial'           => $request->serial,
+            'asset_tag'        => $request->asset_tag,
+            'fixed_asset_code' => $request->fixed_asset_code,
+            'property_type'    => $request->property_type,
+            'purchase_value'   => $request->purchase_value,
+            'purchase_date'    => $request->purchase_date,
+            'provider_name'    => $request->provider_name,
+            'branch_id'        => $request->branch_id,
+            'observations'     => $request->observations,
+        ]);
+
+        return redirect()
+            ->route('assets.show', $asset)
+            ->with('success', "Activo <strong>{$asset->internal_code}</strong> actualizado correctamente.");
     }
 
     public function assetsAssignments() { return view('assets.assignments.index'); }
