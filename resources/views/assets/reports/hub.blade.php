@@ -18,32 +18,32 @@
 @section('content')
 @include('partials._alerts')
 
-{{-- Stats compactos y clicables --}}
 @php
     $statusIds = \App\Models\Status::whereIn('name', ['Asignado','Disponible','Baja'])->pluck('id','name');
 @endphp
-<div class="d-flex flex-wrap mb-3" style="gap:8px;">
-    <a href="{{ route('assets.reports.index') }}"
-       class="btn btn-sm {{ !request()->hasAny(['status_id','property_type']) ? 'btn-primary' : 'btn-outline-primary' }}"
-       style="{{ !request()->hasAny(['status_id','property_type']) ? 'background:#7c3aed;border-color:#7c3aed;' : 'color:#7c3aed;border-color:#7c3aed;' }}">
-        <i class="fas fa-boxes mr-1"></i> Total: <strong>{{ $stats['total'] }}</strong>
-    </a>
-    <a href="{{ route('assets.reports.index', array_merge(request()->all(), ['status_id' => $statusIds['Asignado'] ?? ''])) }}"
-       class="btn btn-sm {{ request('status_id') == ($statusIds['Asignado'] ?? '') ? 'btn-success' : 'btn-outline-success' }}">
-        <i class="fas fa-user-check mr-1"></i> Asignados: <strong>{{ $stats['asignados'] }}</strong>
-    </a>
-    <a href="{{ route('assets.reports.index', array_merge(request()->all(), ['status_id' => $statusIds['Disponible'] ?? ''])) }}"
-       class="btn btn-sm {{ request('status_id') == ($statusIds['Disponible'] ?? '') ? 'btn-info' : 'btn-outline-info' }}">
-        <i class="fas fa-box-open mr-1"></i> Disponibles: <strong>{{ $stats['disponibles'] }}</strong>
-    </a>
-    <a href="{{ route('assets.reports.index', array_merge(request()->all(), ['status_id' => $statusIds['Baja'] ?? ''])) }}"
-       class="btn btn-sm {{ request('status_id') == ($statusIds['Baja'] ?? '') ? 'btn-danger' : 'btn-outline-danger' }}">
-        <i class="fas fa-ban mr-1"></i> Dados de Baja: <strong>{{ $stats['baja'] }}</strong>
-    </a>
-</div>
 
 {{-- Filtros --}}
 <div class="card shadow-sm mb-3">
+    <div class="card-header py-2 d-flex justify-content-between align-items-center" style="background:#f8f9fa;">
+        <div class="d-flex flex-wrap" style="gap:6px;">
+            <a href="{{ route('assets.reports.index') }}"
+               class="btn btn-xs {{ !request()->hasAny(['status_id','property_type']) ? 'btn-primary' : 'btn-outline-secondary' }}">
+                Total <strong>{{ $stats['total'] }}</strong>
+            </a>
+            <a href="{{ route('assets.reports.index', array_merge(request()->all(), ['status_id' => $statusIds['Asignado'] ?? ''])) }}"
+               class="btn btn-xs {{ request('status_id') == ($statusIds['Asignado'] ?? '') ? 'btn-success' : 'btn-outline-secondary' }}">
+                Asignados <strong>{{ $stats['asignados'] }}</strong>
+            </a>
+            <a href="{{ route('assets.reports.index', array_merge(request()->all(), ['status_id' => $statusIds['Disponible'] ?? ''])) }}"
+               class="btn btn-xs {{ request('status_id') == ($statusIds['Disponible'] ?? '') ? 'btn-info' : 'btn-outline-secondary' }}">
+                Disponibles <strong>{{ $stats['disponibles'] }}</strong>
+            </a>
+            <a href="{{ route('assets.reports.index', array_merge(request()->all(), ['status_id' => $statusIds['Baja'] ?? ''])) }}"
+               class="btn btn-xs {{ request('status_id') == ($statusIds['Baja'] ?? '') ? 'btn-danger' : 'btn-outline-secondary' }}">
+                Baja <strong>{{ $stats['baja'] }}</strong>
+            </a>
+        </div>
+    </div>
     <div class="card-body py-2">
         <form method="GET" class="form-inline flex-wrap" style="gap:8px;">
             <input type="text" name="q" value="{{ request('q') }}"
@@ -93,26 +93,24 @@
     </div>
 </div>
 
-{{-- Quick export links --}}
-<div class="mb-3 d-flex" style="gap:8px;">
-    <a href="{{ route('assets.reports.export', request()->all()) }}" class="btn btn-sm btn-outline-success">
-        <i class="fas fa-file-csv mr-1"></i> Exportar completo
-    </a>
-    <a href="{{ route('reports.collaborators.export') }}" class="btn btn-sm btn-outline-info">
-        <i class="fas fa-users mr-1"></i> Reporte colaboradores con activos
-    </a>
-</div>
-
 {{-- Tabla --}}
 <div class="card shadow-sm">
     <div class="card-header py-2 d-flex justify-content-between align-items-center">
-        <span class="font-weight-bold" style="font-size:.9rem;">
-            <i class="fas fa-table mr-1 text-muted"></i>
+        <span class="font-weight-bold text-muted" style="font-size:.85rem;">
             {{ $assets->total() }} activo(s) encontrado(s)
         </span>
-        <a href="{{ route('assets.reports.export', request()->all()) }}" class="btn btn-sm btn-success">
-            <i class="fas fa-file-csv mr-1"></i> Exportar Excel
-        </a>
+        <div class="d-flex" style="gap:6px;">
+            <a href="{{ route('assets.reports.export', request()->all()) }}" class="btn btn-sm btn-outline-success">
+                <i class="fas fa-file-csv mr-1"></i> CSV
+            </a>
+            <a href="{{ route('assets.reports.niif-export', request()->all()) }}" class="btn btn-sm btn-success"
+               title="Valor compra, depreciación, valor en libros, cuenta PUC">
+                <i class="fas fa-calculator mr-1"></i> NIIF
+            </a>
+            <a href="{{ route('reports.collaborators.export') }}" class="btn btn-sm btn-outline-info">
+                <i class="fas fa-users mr-1"></i> Colaboradores
+            </a>
+        </div>
     </div>
     <div class="card-body p-0">
         <div class="table-responsive">

@@ -47,6 +47,20 @@ return [
             'report' => false,
         ],
 
+        // ── Disco SFTP para respaldos en servidor del proveedor ────────────────
+        // Cuando el proveedor entregue las credenciales, llenar en .env y
+        // activar 'sftp_backup' en config/backup.php → destination → disks.
+        // Requiere: composer require league/flysystem-sftp-v3
+        'sftp_backup' => [
+            'driver'     => 'sftp',
+            'host'       => env('BACKUP_SFTP_HOST', ''),
+            'username'   => env('BACKUP_SFTP_USER', ''),
+            'password'   => env('BACKUP_SFTP_PASS', ''),
+            'port'       => env('BACKUP_SFTP_PORT', 22),
+            'root'       => env('BACKUP_SFTP_PATH', '/backups/axvos_inventory'),
+            'timeout'    => 30,
+        ],
+
         's3' => [
             'driver' => 's3',
             'key' => env('AWS_ACCESS_KEY_ID'),

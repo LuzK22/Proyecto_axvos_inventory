@@ -8,6 +8,7 @@ use App\Models\Asset;
 use App\Models\AssetEvent;
 use App\Models\Assignment;
 use App\Models\AssignmentAsset;
+use App\Models\AssignmentType;
 use App\Models\Collaborator;
 use App\Models\Status;
 use Illuminate\Http\Request;
@@ -36,7 +37,7 @@ class AssignmentController extends Controller
     }
 
     /* =========================================================
-     | FORMULARIO NUEVA ASIGNACIÓN
+     | FORMULARIO NUEVA ASIGNACIÃ“N
      ========================================================= */
 
     public function create()
@@ -46,18 +47,27 @@ class AssignmentController extends Controller
             ->orderBy('full_name')
             ->get();
 
-        // Solo activos TI que estén disponibles en este momento
+        // Solo activos TI que estÃ©n disponibles en este momento
         $availableAssets = Asset::with(['type', 'branch', 'status'])
             ->whereHas('type', fn($q) => $q->where('category', 'TI'))
             ->whereHas('status', fn($q) => $q->where('name', 'Disponible'))
             ->orderBy('internal_code')
             ->get();
 
-        return view('tech.assignments.create', compact('collaborators', 'availableAssets'));
+        $modalityAssignmentType = AssignmentType::query()
+            ->where('active', true)
+            ->where(function ($q) {
+                $q->where('trigger_field', 'modalidad')
+                    ->orWhere('name', 'like', '%Modalidad%');
+            })
+            ->orderBy('sort_order')
+            ->first();
+
+        return view('tech.assignments.create', compact('collaborators', 'availableAssets', 'modalityAssignmentType'));
     }
 
     /* =========================================================
-     | GUARDAR NUEVA ASIGNACIÓN
+     | GUARDAR NUEVA ASIGNACIÃ“N
      ========================================================= */
 
     public function store(Request $request)
@@ -75,12 +85,12 @@ class AssignmentController extends Controller
         $assets         = Asset::whereIn('id', $request->asset_ids)->get();
         $assignedStatus = Status::where('name', 'Asignado')->firstOrFail();
 
-        // Revisamos que ningún activo esté ocupado antes de guardar
+        // Revisamos que ningÃºn activo estÃ© ocupado antes de guardar
         $notAvailable = $assets->filter(fn($a) => !$a->isAvailable());
         if ($notAvailable->isNotEmpty()) {
             $codes = $notAvailable->pluck('internal_code')->implode(', ');
             return back()
-                ->withErrors(['asset_ids' => "Los siguientes activos no están disponibles: {$codes}"])
+                ->withErrors(['asset_ids' => "Los siguientes activos no estÃ¡n disponibles: {$codes}"])
                 ->withInput();
         }
 
@@ -108,13 +118,13 @@ class AssignmentController extends Controller
                 $asset->update(['status_id' => $assignedStatus->id]);
             }
 
-            // Generar acta de ENTREGA automática para TI (si aplica y sin duplicar)
+            // Generar acta de ENTREGA automÃ¡tica para TI (si aplica y sin duplicar)
             $acta = Acta::generateDeliveryForAssignment($assignment, 'TI', auth()->user());
         });
 
-        $msg = 'Asignación creada correctamente.';
+        $msg = 'AsignaciÃ³n creada correctamente.';
         if ($acta) {
-            $msg .= ' Se generó el Acta de Entrega TI.';
+            $msg .= ' Se generÃ³ el Acta de Entrega TI.';
             return redirect()->route('actas.show', $acta)->with('success', $msg);
         }
 
@@ -124,7 +134,7 @@ class AssignmentController extends Controller
     }
 
     /* =========================================================
-     | VER DETALLE DE ASIGNACIÓN
+     | VER DETALLE DE ASIGNACIÃ“N
      ========================================================= */
 
     public function show(Assignment $assignment)
@@ -147,12 +157,12 @@ class AssignmentController extends Controller
     }
 
     /* =========================================================
-     | FORMULARIO DEVOLUCIÓN
+     | FORMULARIO DEVOLUCIÃ“N
      ========================================================= */
 
     public function returnForm(Assignment $assignment)
     {
-        // Solo cargamos los activos que aún no fueron devueltos
+        // Solo cargamos los activos que aÃºn no fueron devueltos
         $assignment->load([
             'collaborator',
             'activeAssets.asset.type',
@@ -170,8 +180,8 @@ class AssignmentController extends Controller
     }
 
     /* =========================================================
-     | PROCESAR DEVOLUCIÓN (PARCIAL O TOTAL)
-     | Permite devolver solo algunos activos de la asignación
+     | PROCESAR DEVOLUCIÃ“N (PARCIAL O TOTAL)
+     | Permite devolver solo algunos activos de la asignaciÃ³n
      ========================================================= */
 
     public function processReturn(Request $request, Assignment $assignment)
@@ -191,7 +201,7 @@ class AssignmentController extends Controller
             $returnedAssets = [];
 
             foreach ($request->asset_ids as $assetId) {
-                // Buscamos el pivot activo para este activo en esta asignación
+                // Buscamos el pivot activo para este activo en esta asignaciÃ³n
                 $pivot = AssignmentAsset::where('assignment_id', $assignment->id)
                     ->where('asset_id', $assetId)
                     ->whereNull('returned_at')
@@ -217,10 +227,10 @@ class AssignmentController extends Controller
                 }
             }
 
-            // Verificamos si quedaron activos pendientes o si la asignación queda cerrada
+            // Verificamos si quedaron activos pendientes o si la asignaciÃ³n queda cerrada
             $assignment->refreshStatus();
 
-            // Generamos el acta solo si efectivamente se devolvió algo
+            // Generamos el acta solo si efectivamente se devolviÃ³ algo
             if (!empty($returnedAssets)) {
                 $acta = Acta::create([
                     'assignment_id' => $assignment->id,
@@ -231,7 +241,7 @@ class AssignmentController extends Controller
                     'notes'         => $request->return_notes,
                 ]);
 
-                // El colaborador tiene 7 días para firmar el acta de devolución
+                // El colaborador tiene 7 dÃ­as para firmar el acta de devoluciÃ³n
                 ActaSignature::create([
                     'acta_id'          => $acta->id,
                     'signer_role'      => 'collaborator',
@@ -256,57 +266,84 @@ class AssignmentController extends Controller
         if ($acta) {
             return redirect()
                 ->route('actas.show', $acta)
-                ->with('success', 'Devolución registrada. Se generó el Acta de Devolución.');
+                ->with('success', 'DevoluciÃ³n registrada. Se generÃ³ el Acta de DevoluciÃ³n.');
         }
 
         return redirect()
             ->route('tech.assignments.show', $assignment)
-            ->with('success', 'Devolución registrada correctamente.');
+            ->with('success', 'DevoluciÃ³n registrada correctamente.');
     }
 
     /* =========================================================
-     | BUSCAR COLABORADOR (AJAX — por nombre o cédula)
+     | BUSCAR COLABORADOR (AJAX â€” por nombre o cÃ©dula)
      ========================================================= */
 
     public function search(Request $request)
     {
-        $query = $request->get('q', '');
+        $query = trim((string) $request->get('q', ''));
+        $isApiRequest = $request->expectsJson() || $request->ajax() || $request->wantsJson();
 
-        // Evitamos queries innecesarias con menos de 2 caracteres
-        if (strlen($query) < 2) {
-            return response()->json([]);
+        $collaboratorsQuery = Collaborator::where('active', true);
+        if ($query !== '') {
+            $collaboratorsQuery->where('full_name', 'like', "%{$query}%");
         }
 
-        $collaborators = Collaborator::where('active', true)
-            ->where(function ($q) use ($query) {
-                // document is encrypted — search by full_name only
-                $q->where('full_name', 'like', "%{$query}%");
-            })
+        $collaborators = $collaboratorsQuery
             ->with('branch')
             ->limit(10)
             ->get()
-            ->map(fn($c) => [
-                'id'         => $c->id,
-                'text'       => "{$c->full_name} - CC {$c->document}",
-                'full_name'  => $c->full_name,
-                'document'   => $c->document,
-                'position'   => $c->position,
-                'area'       => $c->area,
-                'branch'     => $c->branch?->name,
-                'modality'   => $c->modalidad_trabajo,
-            ]);
+            ->map(function ($c) {
+                try {
+                    $document = $c->document;
+                } catch (\Throwable $e) {
+                    $document = (string) $c->getRawOriginal('document');
+                }
 
-        return response()->json($collaborators);
+                return [
+                    'id'         => $c->id,
+                    'text'       => "{$c->full_name} - CC {$document}",
+                    'full_name'  => $c->full_name,
+                    'document'   => $document,
+                    'position'   => $c->position,
+                    'area'       => $c->area,
+                    'branch'     => $c->branch?->name,
+                    'modality'   => $c->modalidad_trabajo,
+                ];
+            });
+
+        if ($isApiRequest) {
+            return response()->json($collaborators);
+        }
+
+        $collaboratorIds = $collaborators->pluck('id')->all();
+        $assetsByCollaborator = AssignmentAsset::query()
+            ->with(['asset.type', 'assignment'])
+            ->whereNull('returned_at')
+            ->whereHas('assignment', fn($q) => $q->whereIn('collaborator_id', $collaboratorIds))
+            ->whereHas('asset.type', fn($q) => $q->where('category', 'TI'))
+            ->get()
+            ->groupBy(fn($aa) => $aa->assignment?->collaborator_id)
+            ->map(function ($items) {
+                return $items->map(fn($aa) => [
+                    'internal_code' => $aa->asset?->internal_code,
+                    'type'          => $aa->asset?->type?->name,
+                ])->filter(fn($item) => !empty($item['internal_code']))->values();
+            });
+
+        return view('tech.assignments.search', [
+            'q' => $query,
+            'results' => $collaborators,
+            'assetsByCollaborator' => $assetsByCollaborator,
+        ]);
     }
-
     /* =========================================================
      | ACTIVOS ASIGNADOS A UN COLABORADOR (AJAX)
-     | Lo usa el formulario de nueva asignación para mostrar qué tiene el colaborador
+     | Lo usa el formulario de nueva asignaciÃ³n para mostrar quÃ© tiene el colaborador
      ========================================================= */
 
     public function collaboratorAssets(Collaborator $collaborator)
     {
-        // Solo los que aún no han sido devueltos
+        // Solo los que aÃºn no han sido devueltos
         $activeAssignmentAssets = AssignmentAsset::whereNull('returned_at')
             ->whereHas('assignment', fn($q) => $q->where('collaborator_id', $collaborator->id))
             ->with(['asset.type', 'asset.status', 'assignment'])

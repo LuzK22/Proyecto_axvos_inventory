@@ -135,7 +135,7 @@ class CollaboratorController extends Controller
         // Base: activos actualmente asignados a este colaborador
         $baseQuery = AssignmentAsset::whereNull('returned_at')
             ->whereHas('assignment', fn($q) => $q->where('collaborator_id', $collaborator->id))
-            ->with(['asset.type', 'asset.status', 'assignment']);
+            ->with(['asset.type', 'asset.status', 'asset.branch', 'assignment']);
 
         // Activos TI asignados
         $tiItems = (clone $baseQuery)
@@ -148,9 +148,29 @@ class CollaboratorController extends Controller
             ->get();
 
         // Préstamos activos para este colaborador
-        $activeLoans = Loan::with('asset.type')
+        $activeTiLoans = Loan::with(['asset.type', 'asset.status', 'asset.branch'])
             ->where('collaborator_id', $collaborator->id)
             ->where('status', 'activo')
+            ->where(function ($q) {
+                $q->where('category', 'TI')
+                    ->orWhere(function ($legacy) {
+                        $legacy->whereNull('category')
+                            ->whereHas('asset.type', fn($t) => $t->where('category', 'TI'));
+                    });
+            })
+            ->orderBy('end_date')
+            ->get();
+
+        $activeOtroLoans = Loan::with(['asset.type', 'asset.status', 'asset.branch'])
+            ->where('collaborator_id', $collaborator->id)
+            ->where('status', 'activo')
+            ->where(function ($q) {
+                $q->where('category', 'OTRO')
+                    ->orWhere(function ($legacy) {
+                        $legacy->whereNull('category')
+                            ->whereHas('asset.type', fn($t) => $t->where('category', 'OTRO'));
+                    });
+            })
             ->orderBy('end_date')
             ->get();
 
@@ -165,7 +185,8 @@ class CollaboratorController extends Controller
         $stats = [
             'ti'       => $tiItems->count(),
             'otro'     => $otroItems->count(),
-            'loans'    => $activeLoans->count(),
+            'loans_ti' => $activeTiLoans->count(),
+            'loans_otro' => $activeOtroLoans->count(),
             'history'  => $assignmentHistory->count(),
         ];
 
@@ -173,7 +194,8 @@ class CollaboratorController extends Controller
             'collaborator',
             'tiItems',
             'otroItems',
-            'activeLoans',
+            'activeTiLoans',
+            'activeOtroLoans',
             'assignmentHistory',
             'stats'
         ));

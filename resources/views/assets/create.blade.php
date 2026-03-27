@@ -215,6 +215,72 @@
                         </div>
                     </div>
                 </div>
+
+                {{-- ── Campos NIIF NIC 16 ── --}}
+                <hr class="mt-3 mb-2">
+                <p class="text-muted small mb-2">
+                    <i class="fas fa-calculator mr-1" style="color:#059669;"></i>
+                    <strong>Campos contables NIIF NIC 16</strong> — usados para calcular depreciación y valor en libros en los reportes.
+                </p>
+                <div class="form-row">
+                    <div class="col-md-4">
+                        <div class="form-group mb-2">
+                            <label class="font-weight-bold">Vida Útil (años)</label>
+                            <input type="number" name="useful_life_years" min="1" max="99"
+                                   class="form-control @error('useful_life_years') is-invalid @enderror"
+                                   placeholder="ej. 10"
+                                   value="{{ old('useful_life_years') }}">
+                            @error('useful_life_years')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-group mb-2">
+                            <label class="font-weight-bold">Método Depreciación</label>
+                            <select name="depreciation_method" class="form-control @error('depreciation_method') is-invalid @enderror">
+                                <option value="">Seleccionar...</option>
+                                <option value="linea_recta"         {{ old('depreciation_method') === 'linea_recta'          ? 'selected' : '' }}>Línea recta</option>
+                                <option value="saldo_decreciente"   {{ old('depreciation_method') === 'saldo_decreciente'    ? 'selected' : '' }}>Saldo decreciente</option>
+                                <option value="unidades_produccion" {{ old('depreciation_method') === 'unidades_produccion'  ? 'selected' : '' }}>Unidades de producción</option>
+                                <option value="no_deprecia"         {{ old('depreciation_method') === 'no_deprecia'          ? 'selected' : '' }}>No deprecia</option>
+                            </select>
+                            @error('depreciation_method')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-group mb-2">
+                            <label class="font-weight-bold">Valor Residual</label>
+                            <div class="input-group">
+                                <div class="input-group-prepend"><span class="input-group-text">$</span></div>
+                                <input type="number" name="residual_value" min="0" step="0.01"
+                                       class="form-control @error('residual_value') is-invalid @enderror"
+                                       placeholder="0.00"
+                                       value="{{ old('residual_value') }}">
+                                @error('residual_value')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="col-md-4">
+                        <div class="form-group mb-0">
+                            <label class="font-weight-bold">Inicio Depreciación</label>
+                            <input type="date" name="depreciation_start_date"
+                                   class="form-control @error('depreciation_start_date') is-invalid @enderror"
+                                   value="{{ old('depreciation_start_date') }}">
+                            @error('depreciation_start_date')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-group mb-0">
+                            <label class="font-weight-bold">Cuenta PUC</label>
+                            <input type="text" name="account_code" maxlength="20"
+                                   class="form-control @error('account_code') is-invalid @enderror"
+                                   placeholder="ej. 1520010101"
+                                   value="{{ old('account_code') }}">
+                            @error('account_code')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 

@@ -69,6 +69,18 @@ Route::middleware('auth')->prefix('2fa')->name('2fa.')->group(function () {
 
 /*
 |--------------------------------------------------------------------------
+| CONSENTIMIENTO DE DATOS — Ley 1581/2012 Colombia
+| Solo requiere auth (el usuario aún puede no haber aceptado la política)
+|--------------------------------------------------------------------------
+*/
+Route::middleware('auth')->prefix('consent')->name('consent.')->group(function () {
+    Route::get('/',       [\App\Http\Controllers\ConsentController::class, 'show'])    ->name('show');
+    Route::post('/accept',[\App\Http\Controllers\ConsentController::class, 'accept'])  ->name('accept');
+    Route::get('/history',[\App\Http\Controllers\ConsentController::class, 'history']) ->name('history');
+});
+
+/*
+|--------------------------------------------------------------------------
 | CENTRO DE SEGURIDAD
 |--------------------------------------------------------------------------
 */
@@ -84,7 +96,7 @@ Route::middleware(['auth', 'require.2fa'])->prefix('security')->name('security.'
 | RUTAS PROTEGIDAS
 |--------------------------------------------------------------------------
 */
-Route::middleware(['auth', 'require.2fa'])->group(function () {
+Route::middleware(['auth', 'require.consent', 'require.2fa'])->group(function () {
 
     /*
     |--------------------------------------------------------------------------
@@ -261,7 +273,7 @@ Route::middleware(['auth', 'require.2fa'])->group(function () {
 
             Route::get('/assignments/search/collaborators', [AssignmentController::class, 'search'])
                 ->name('assignments.search')
-                ->middleware('can:tech.assets.assign');
+                ->middleware('can:collaborators.view');
 
             Route::get('/assignments/create', [AssignmentController::class, 'create'])
                 ->name('assignments.create')
@@ -302,6 +314,10 @@ Route::middleware(['auth', 'require.2fa'])->group(function () {
             Route::get('/reports/export', [ReportController::class, 'techExport'])
                 ->name('reports.export')
                 ->middleware('can:tech.reports.view');
+
+            Route::get('/reports/niif-export', [ReportController::class, 'techNiifExport'])
+                ->name('reports.niif-export')
+                ->middleware('can:tech.reports.view');
         });
 
     /*
@@ -321,18 +337,14 @@ Route::middleware(['auth', 'require.2fa'])->group(function () {
             Route::get('/disposals/create', [DeletionRequestController::class, 'assetsCreate']) ->name('disposals.create') ->middleware('can:assets.disposal.request');
             Route::get('/reports/hub',      [ReportController::class, 'assets'])        ->name('reports.hub')      ->middleware('can:assets.reports.view');
 
-            // ── INVENTARIO DE OTROS ACTIVOS — CRUD ────────────────────────────
+            // ── INVENTARIO DE OTROS ACTIVOS — Rutas estáticas ─────────────────
             Route::middleware('can:assets.view')->group(function () {
-                Route::get('/',                    [AssetController::class, 'assetsIndex'])  ->name('index');
-                Route::get('/create',              [AssetController::class, 'assetsCreate']) ->name('create')
+                Route::get('/',       [AssetController::class, 'assetsIndex'])  ->name('index');
+                Route::get('/create', [AssetController::class, 'assetsCreate']) ->name('create')
                     ->middleware('can:assets.create');
-                Route::post('/',                   [AssetController::class, 'assetsStore'])  ->name('store')
+                Route::post('/',      [AssetController::class, 'assetsStore'])  ->name('store')
                     ->middleware('can:assets.create');
-                Route::get('/{asset}',             [AssetController::class, 'assetsShow'])   ->name('show');
-                Route::get('/{asset}/edit',        [AssetController::class, 'assetsEdit'])   ->name('edit')
-                    ->middleware('can:assets.edit');
-                Route::put('/{asset}',             [AssetController::class, 'assetsUpdate']) ->name('update')
-                    ->middleware('can:assets.edit');
+                // NOTA: /{asset} va AL FINAL del grupo para no capturar rutas específicas
             });
 
             // ── ASIGNACIONES DE OTROS ACTIVOS — CRUD ──────────────────────────
@@ -355,7 +367,7 @@ Route::middleware(['auth', 'require.2fa'])->group(function () {
             Route::get('/loans/{loan}/return', [OtroLoanController::class, 'returnForm'])                   ->name('loans.return')       ->middleware('can:assets.assign');
             Route::post('/loans/{loan}/return',[OtroLoanController::class, 'processReturn'])                ->name('loans.return.store') ->middleware('can:assets.assign');
 
-            // ── HISTORIAL, BAJAS Y REPORTES ────────────────────────────────────
+            // ── HISTORIAL Y REPORTES ────────────────────────────────────────────
             Route::get('/history', [AssetController::class, 'assetsHistory'])
                 ->name('history.index')
                 ->middleware('can:assets.history.view');
@@ -367,6 +379,20 @@ Route::middleware(['auth', 'require.2fa'])->group(function () {
             Route::get('/reports/export', [ReportController::class, 'assetsExport'])
                 ->name('reports.export')
                 ->middleware('can:assets.reports.view');
+
+            Route::get('/reports/niif-export', [ReportController::class, 'assetsNiifExport'])
+                ->name('reports.niif-export')
+                ->middleware('can:assets.reports.view');
+
+            // ── INVENTARIO — Rutas con parámetro (SIEMPRE AL FINAL del grupo) ──
+            // Deben ir después de todas las rutas estáticas para evitar colisiones.
+            Route::middleware('can:assets.view')->group(function () {
+                Route::get('/{asset}',      [AssetController::class, 'assetsShow'])   ->name('show');
+                Route::get('/{asset}/edit', [AssetController::class, 'assetsEdit'])   ->name('edit')
+                    ->middleware('can:assets.edit');
+                Route::put('/{asset}',      [AssetController::class, 'assetsUpdate']) ->name('update')
+                    ->middleware('can:assets.edit');
+            });
         });
 
     // Áreas (espacios físicos para asignación de Otros Activos)
@@ -502,6 +528,14 @@ Route::middleware(['auth', 'require.2fa'])->group(function () {
     | ADMINISTRACIÓN — CONFIGURACIÓN DEL SISTEMA
     |--------------------------------------------------------------------------
     */
+    // ── Módulo Respaldo y Recuperación (solo Admin) ─────────────────────────────
+    Route::prefix('admin/backup')->name('admin.backup.')->middleware('role:Admin')->group(function () {
+        Route::get('/',                              [\App\Http\Controllers\BackupController::class, 'index'])   ->name('index');
+        Route::post('/run',                          [\App\Http\Controllers\BackupController::class, 'run'])     ->name('run');
+        Route::get('/download/{filename}',           [\App\Http\Controllers\BackupController::class, 'download'])->name('download');
+        Route::delete('/{backup}',                   [\App\Http\Controllers\BackupController::class, 'destroy']) ->name('destroy');
+    });
+
     Route::middleware('can:admin.settings')->prefix('admin')->name('admin.')->group(function () {
 
         Route::get('/settings', [SettingsController::class, 'index'])

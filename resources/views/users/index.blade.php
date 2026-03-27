@@ -4,9 +4,14 @@
 
 @section('content_header')
     <div class="d-flex justify-content-between align-items-center">
-        <h1 class="m-0 font-weight-bold" style="color:#0d1b2a;">
-            <i class="fas fa-users mr-2" style="color:#00b4d8;"></i> Usuarios del Sistema
-        </h1>
+        <div class="d-flex align-items-center">
+            <a href="{{ route('admin.hub') }}" class="btn btn-sm btn-secondary mr-3">
+                <i class="fas fa-arrow-left mr-1"></i> Administración
+            </a>
+            <h1 class="m-0 font-weight-bold" style="color:#0d1b2a;">
+                <i class="fas fa-users mr-2" style="color:#00b4d8;"></i> Usuarios del Sistema
+            </h1>
+        </div>
         @can('users.manage')
         <a href="{{ route('users.create') }}" class="btn btn-primary btn-sm">
             <i class="fas fa-plus mr-1"></i> Nuevo Usuario

@@ -47,11 +47,19 @@ class Asset extends Model
         'observations',
         'created_by',
         'updated_by',
+        // ── NIIF / NIC 16 ──────────────────────────────────────
+        'useful_life_years',       // Vida útil en años
+        'residual_value',          // Valor de salvamento
+        'depreciation_method',     // linea_recta | saldo_decreciente | unidades_produccion | no_deprecia
+        'depreciation_start_date', // Fecha inicio depreciación
+        'account_code',            // Código PUC Colombia (ej. 1524050501)
     ];
 
     protected $casts = [
-        'purchase_date'  => 'date',
-        'purchase_value' => 'decimal:2',
+        'purchase_date'           => 'date',
+        'purchase_value'          => 'decimal:2',
+        'residual_value'          => 'decimal:2',
+        'depreciation_start_date' => 'date',
     ];
 
     // ─── Relaciones ────────────────────────────────────────
@@ -153,5 +161,48 @@ class Asset extends Model
             'Vendido'       => 'badge bg-dark',
             default         => 'badge bg-light text-dark',
         };
+    }
+
+    // ─── Accessors NIIF / NIC 16 ───────────────────────────
+
+    /**
+     * Depreciación anual por línea recta (NIIF NIC 16).
+     * Fórmula: (Valor adquisición − Valor residual) / Vida útil en años
+     * Retorna null si faltan datos contables.
+     */
+    public function getAnnualDepreciationAttribute(): ?float
+    {
+        if (
+            !$this->purchase_value ||
+            !$this->useful_life_years ||
+            $this->useful_life_years <= 0 ||
+            $this->depreciation_method === 'no_deprecia'
+        ) {
+            return null;
+        }
+
+        $residual = (float) ($this->residual_value ?? 0);
+        return round(((float) $this->purchase_value - $residual) / $this->useful_life_years, 2);
+    }
+
+    /**
+     * Valor en libros actual (NIIF NIC 16).
+     * Fórmula: Valor adquisición − (Depreciación anual × años transcurridos)
+     * Nunca baja del valor residual.  Retorna null si faltan datos.
+     */
+    public function getCurrentBookValueAttribute(): ?float
+    {
+        $annual = $this->annual_depreciation;
+
+        if ($annual === null || !$this->depreciation_start_date) {
+            return $this->purchase_value ? (float) $this->purchase_value : null;
+        }
+
+        $yearsElapsed = (float) $this->depreciation_start_date->diffInDays(now()) / 365;
+        $accumulated  = $annual * $yearsElapsed;
+        $bookValue    = (float) $this->purchase_value - $accumulated;
+        $residual     = (float) ($this->residual_value ?? 0);
+
+        return round(max($bookValue, $residual), 2);
     }
 }

@@ -3,13 +3,22 @@
 @section('title', 'Sucursales')
 
 @section('content_header')
-    <h1>Sucursales</h1>
+    <div class="d-flex justify-content-between align-items-center">
+        <div class="d-flex align-items-center">
+            <a href="{{ route('admin.hub') }}" class="btn btn-sm btn-secondary mr-3">
+                <i class="fas fa-arrow-left mr-1"></i> Administración
+            </a>
+            <h1 class="m-0 font-weight-bold" style="color:#0d1b2a;">
+                <i class="fas fa-building mr-2" style="color:#00b4d8;"></i> Sucursales
+            </h1>
+        </div>
+        <a href="{{ route('branches.create') }}" class="btn btn-primary btn-sm">
+            <i class="fas fa-plus mr-1"></i> Nueva Sucursal
+        </a>
+    </div>
 @stop
 
 @section('content')
-    <a href="{{ route('branches.create') }}" class="btn btn-primary mb-3">
-        Nueva Sucursal
-    </a>
 
     <table class="table table-bordered">
         <tr>

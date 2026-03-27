@@ -95,6 +95,16 @@ class UserController extends Controller
 
         $user->assignRole($request->role);
 
+        activity()
+            ->causedBy(auth()->user())
+            ->performedOn($user)
+            ->withProperties([
+                'rol'      => $request->role,
+                'email'    => $user->email,
+                'sucursal' => $user->branch?->name,
+            ])
+            ->log("Usuario '{$user->name}' creado con rol {$request->role}");
+
         return redirect()->route('users.index')
             ->with('success', "Usuario '{$user->name}' creado correctamente.");
     }
@@ -153,8 +163,28 @@ class UserController extends Controller
             $data['password_changed_at'] = now();
         }
 
+        $rolAnterior = $user->roles->first()?->name ?? 'Sin rol';
         $user->update($data);
         $user->syncRoles([$request->role]);
+
+        $props = ['email' => $user->email];
+        if ($rolAnterior !== $request->role) {
+            $props['rol_anterior'] = $rolAnterior;
+            $props['rol_nuevo']    = $request->role;
+        }
+        if ($request->filled('password')) {
+            $props['password_cambiada'] = true;
+        }
+
+        activity()
+            ->causedBy(auth()->user())
+            ->performedOn($user)
+            ->withProperties($props)
+            ->log(
+                $rolAnterior !== $request->role
+                    ? "Rol de '{$user->name}' cambiado: {$rolAnterior} → {$request->role}"
+                    : "Usuario '{$user->name}' actualizado"
+            );
 
         return redirect()->route('users.index')
             ->with('success', "Usuario '{$user->name}' actualizado correctamente.");

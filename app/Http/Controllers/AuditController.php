@@ -8,9 +8,12 @@ use App\Models\Assignment;
 use App\Models\AssignmentAsset;
 use App\Models\Branch;
 use App\Models\Collaborator;
+use App\Models\ExportLog;
 use App\Models\Loan;
 use App\Models\Status;
+use App\Models\UserSession;
 use Illuminate\Http\Request;
+use Spatie\Activitylog\Models\Activity;
 
 class AuditController extends Controller
 {
@@ -35,11 +38,15 @@ class AuditController extends Controller
         $stats     = $this->globalStats();
 
         $data = match ($tab) {
-            'otros'        => $this->queryOtros($request),
-            'prestamos'    => $this->queryPrestamos($request),
-            'asignaciones' => $this->queryAsignaciones($request),
-            'log'          => $this->queryLog($request),
-            default        => $this->queryTi($request),
+            'otros'          => $this->queryOtros($request),
+            'prestamos'      => $this->queryPrestamos($request),
+            'asignaciones'   => $this->queryAsignaciones($request),
+            'log'            => $this->queryLog($request),
+            'actividad'      => $this->queryActividad($request),
+            'bajas'          => $this->queryBajas($request),
+            'sesiones'       => $this->querySesiones($request),
+            'exportaciones'  => $this->queryExportaciones($request),
+            default          => $this->queryTi($request),
         };
 
         return view('audit.hub', compact(
@@ -57,11 +64,15 @@ class AuditController extends Controller
         $tab = $request->get('tab', 'ti');
 
         [$rows, $headers, $filename] = match ($tab) {
-            'otros'        => $this->exportOtros($request),
-            'prestamos'    => $this->exportPrestamos($request),
-            'asignaciones' => $this->exportAsignaciones($request),
-            'log'          => $this->exportLog($request),
-            default        => $this->exportTi($request),
+            'otros'         => $this->exportOtros($request),
+            'prestamos'     => $this->exportPrestamos($request),
+            'asignaciones'  => $this->exportAsignaciones($request),
+            'log'           => $this->exportLog($request),
+            'bajas'         => $this->exportBajas($request),
+            'sesiones'      => $this->exportSesiones($request),
+            'actividad'     => $this->exportActividad($request),
+            'exportaciones' => $this->exportExportaciones($request),
+            default         => $this->exportTi($request),
         };
 
         return response()->streamDownload(function () use ($rows, $headers) {
@@ -259,6 +270,223 @@ class AuditController extends Controller
         return [$rows,
             ['ID','Colaborador','Cedula','Sucursal','Modalidad','Fecha','Activos','Estado','Registrado por'],
             'auditoria_asignaciones_' . now()->format('Ymd_His') . '.csv'];
+    }
+
+    /** Exporta activos dados de baja (TI y OTRO) con valor en libros NIIF */
+    private function exportBajas(Request $r): array
+    {
+        $statusNames = ['Baja', 'Donado', 'Vendido'];
+
+        $q = Asset::with(['type', 'status', 'branch'])
+            ->whereHas('status', fn($sq) => $sq->whereIn('name', $statusNames));
+
+        // Filtros opcionales
+        if ($r->filled('category'))  $q->whereHas('type', fn($sq) => $sq->where('category', $r->category));
+        if ($r->filled('branch_id')) $q->where('branch_id', $r->branch_id);
+        if ($r->filled('from'))      $q->where('updated_at', '>=', $r->from . ' 00:00:00');
+        if ($r->filled('to'))        $q->where('updated_at', '<=', $r->to . ' 23:59:59');
+
+        $rows = $q->orderBy('updated_at', 'desc')->get();
+
+        ExportLog::record('bajas_activos', 'csv', $r->all(), $rows->count());
+
+        $data = $rows->map(fn($a) => [
+            $a->internal_code,
+            $a->fixed_asset_code    ?? 'PENDIENTE',
+            $a->type?->category     ?? '',
+            $a->type?->name         ?? '',
+            $a->brand               ?? '',
+            $a->model               ?? '',
+            $a->serial              ?? '',
+            $a->status?->name       ?? '',
+            $a->purchase_value      ? number_format($a->purchase_value, 2, '.', '') : '',
+            $a->current_book_value  ? number_format($a->current_book_value, 2, '.', '') : '',
+            $a->account_code        ?? '',
+            $a->branch?->name       ?? '',
+            $a->updated_at?->format('d/m/Y') ?? '',
+        ]);
+
+        return [$data,
+            ['Cód. Inventario','Cód. Activo Fijo','Categoría','Tipo','Marca','Modelo',
+             'Serial','Motivo Baja','Valor Compra','Valor en Libros','Cuenta PUC',
+             'Sucursal','Fecha Baja'],
+            'bajas_activos_' . now()->format('Ymd_His') . '.csv'];
+    }
+
+    /** Exporta sesiones activas e históricas de usuarios (ISO 27001) */
+    private function exportSesiones(Request $r): array
+    {
+        $q = UserSession::with(['user.roles', 'user.branch'])
+            ->orderByDesc('last_active_at');
+
+        if ($r->filled('from')) $q->where('created_at', '>=', $r->from . ' 00:00:00');
+        if ($r->filled('to'))   $q->where('created_at', '<=', $r->to . ' 23:59:59');
+
+        $rows = $q->get();
+
+        ExportLog::record('sesiones_usuarios', 'csv', $r->all(), $rows->count());
+
+        $data = $rows->map(fn($s) => [
+            $s->user?->name              ?? 'Desconocido',
+            $s->user?->email             ?? '',
+            $s->user?->roles->pluck('name')->implode(', ') ?? '',
+            $s->user?->branch?->name     ?? '',
+            $s->ip_address               ?? '',
+            $s->deviceName(),
+            $s->created_at?->format('d/m/Y H:i')     ?? '',
+            $s->last_active_at?->format('d/m/Y H:i') ?? '',
+        ]);
+
+        return [$data,
+            ['Usuario','Email','Roles','Sucursal','IP','Dispositivo','Inicio Sesión','Última Actividad'],
+            'sesiones_usuarios_' . now()->format('Ymd_His') . '.csv'];
+    }
+
+    /* =========================================================
+     | ACTIVIDAD DEL SISTEMA — activity_log de Spatie
+     ========================================================= */
+
+    private function queryActividad(Request $r)
+    {
+        $q = Activity::with('causer')
+            ->orderByDesc('created_at');
+
+        if ($r->filled('search')) {
+            $s = $r->search;
+            $q->where(fn($sq) =>
+                $sq->where('description', 'like', "%{$s}%")
+                   ->orWhere('log_name', 'like', "%{$s}%")
+            );
+        }
+
+        if ($r->filled('causer_id')) {
+            $q->where('causer_id', $r->causer_id)
+              ->where('causer_type', 'App\\Models\\User');
+        }
+
+        if ($r->filled('log_name')) {
+            $q->where('log_name', $r->log_name);
+        }
+
+        if ($r->filled('from')) $q->where('created_at', '>=', $r->from . ' 00:00:00');
+        if ($r->filled('to'))   $q->where('created_at', '<=', $r->to   . ' 23:59:59');
+
+        return $q->paginate(self::PER_PAGE)->withQueryString();
+    }
+
+    private function exportActividad(Request $r): array
+    {
+        $q = Activity::with('causer')->orderByDesc('created_at');
+
+        if ($r->filled('causer_id')) {
+            $q->where('causer_id', $r->causer_id)
+              ->where('causer_type', 'App\\Models\\User');
+        }
+        if ($r->filled('log_name')) $q->where('log_name', $r->log_name);
+        if ($r->filled('from'))     $q->where('created_at', '>=', $r->from . ' 00:00:00');
+        if ($r->filled('to'))       $q->where('created_at', '<=', $r->to   . ' 23:59:59');
+
+        $rows = $q->get()->map(fn($a) => [
+            $a->causer?->name   ?? 'Sistema',
+            $a->causer?->email  ?? '',
+            $a->log_name        ?? '',
+            $a->description,
+            $a->subject_type    ? class_basename($a->subject_type) : '',
+            $a->subject_id      ?? '',
+            $a->properties->except(['old'])->toJson(JSON_UNESCAPED_UNICODE),
+            $a->created_at?->format('d/m/Y H:i:s') ?? '',
+        ]);
+
+        ExportLog::record('actividad_sistema', 'csv', $r->all(), $rows->count());
+
+        return [$rows,
+            ['Usuario','Email','Módulo','Descripción','Tipo Objeto','ID Objeto','Propiedades','Fecha y Hora'],
+            'actividad_sistema_' . now()->format('Ymd_His') . '.csv'];
+    }
+
+    /* =========================================================
+     | BAJAS — query para vista en hub
+     ========================================================= */
+
+    private function queryBajas(Request $r)
+    {
+        $statusNames = ['Baja', 'Donado', 'Vendido'];
+
+        $q = Asset::with(['type', 'status', 'branch'])
+            ->whereHas('status', fn($sq) => $sq->whereIn('name', $statusNames));
+
+        if ($r->filled('category'))  $q->whereHas('type', fn($sq) => $sq->where('category', $r->category));
+        if ($r->filled('branch_id')) $q->where('branch_id', $r->branch_id);
+        if ($r->filled('from'))      $q->where('updated_at', '>=', $r->from . ' 00:00:00');
+        if ($r->filled('to'))        $q->where('updated_at', '<=', $r->to   . ' 23:59:59');
+
+        return $q->orderByDesc('updated_at')->paginate(self::PER_PAGE)->withQueryString();
+    }
+
+    /* =========================================================
+     | SESIONES — query para vista en hub
+     ========================================================= */
+
+    private function querySesiones(Request $r)
+    {
+        $q = UserSession::with(['user.roles', 'user.branch'])
+            ->orderByDesc('last_active_at');
+
+        if ($r->filled('search')) {
+            $s = $r->search;
+            $q->whereHas('user', fn($sq) => $sq->where('name', 'like', "%{$s}%")
+                ->orWhere('email', 'like', "%{$s}%"));
+        }
+        if ($r->filled('from')) $q->where('created_at', '>=', $r->from . ' 00:00:00');
+        if ($r->filled('to'))   $q->where('created_at', '<=', $r->to   . ' 23:59:59');
+
+        return $q->paginate(self::PER_PAGE)->withQueryString();
+    }
+
+    /* =========================================================
+     | EXPORTACIONES — query para vista en hub
+     ========================================================= */
+
+    private function queryExportaciones(Request $r)
+    {
+        $q = ExportLog::with('user')
+            ->orderByDesc('created_at');
+
+        if ($r->filled('search')) {
+            $s = $r->search;
+            $q->where('entity_type', 'like', "%{$s}%")
+              ->orWhereHas('user', fn($sq) => $sq->where('name', 'like', "%{$s}%"));
+        }
+        if ($r->filled('from')) $q->where('created_at', '>=', $r->from . ' 00:00:00');
+        if ($r->filled('to'))   $q->where('created_at', '<=', $r->to   . ' 23:59:59');
+
+        return $q->paginate(self::PER_PAGE)->withQueryString();
+    }
+
+    /* =========================================================
+     | EXPORTAR CSV — Exportaciones realizadas
+     ========================================================= */
+
+    private function exportExportaciones(Request $r): array
+    {
+        $q = ExportLog::with('user')->orderByDesc('created_at');
+
+        if ($r->filled('from')) $q->where('created_at', '>=', $r->from . ' 00:00:00');
+        if ($r->filled('to'))   $q->where('created_at', '<=', $r->to   . ' 23:59:59');
+
+        $rows = $q->get()->map(fn($e) => [
+            $e->user?->name     ?? 'Sistema',
+            $e->user?->email    ?? '',
+            $e->entity_type,
+            strtoupper($e->format),
+            $e->rows_exported,
+            $e->ip_address      ?? '',
+            $e->created_at?->format('d/m/Y H:i') ?? '',
+        ]);
+
+        return [$rows,
+            ['Usuario','Email','Módulo Exportado','Formato','Filas','IP','Fecha y Hora'],
+            'exportaciones_' . now()->format('Ymd_His') . '.csv'];
     }
 
     private function exportLog(Request $r): array

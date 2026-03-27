@@ -575,10 +575,14 @@ const MODALITY_COLORS  = { 'remoto':'#1d4ed8', 'presencial':'#16a34a', 'hibrido'
 const MODALITY_LABELS  = { 'remoto':'Remoto',  'presencial':'Presencial', 'hibrido':'Mixto' };
 
 const CHART_OPTS = {
-    cutout: '68%',
-    plugins: {
-        legend: { display: false },
-        tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${ctx.raw}` } }
+    cutoutPercentage: 68,
+    legend: { display: false },
+    tooltips: {
+        callbacks: {
+            label: function(item, data) {
+                return ' ' + data.labels[item.index] + ': ' + data.datasets[item.datasetIndex].data[item.index];
+            }
+        }
     },
     animation: { animateScale: true }
 };

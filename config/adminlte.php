@@ -371,11 +371,14 @@ return [
     | ADMINISTRACIÓN
     |--------------------------------------------------------------------------
     */
+    ['header' => 'HERRAMIENTAS', 'can' => 'tech.assets.view'],
+
+    ['text' => 'Asistente IA', 'icon' => 'fas fa-robot', 'route' => 'ai.hub', 'can' => 'tech.assets.view', 'icon_color' => 'cyan'],
+
     ['header' => 'ADMINISTRACIÓN', 'can' => 'users.manage'],
 
-    ['text' => 'Administración',    'icon' => 'fas fa-cog',           'route' => 'admin.hub',            'can' => 'users.manage'],
-    ['text' => 'Documentación',     'icon' => 'fas fa-file-signature', 'route' => 'documents.hub',       'can' => 'tech.assets.assign'],
-    ['text' => 'Asistente IA',      'icon' => 'fas fa-robot',          'route' => 'ai.hub',              'can' => 'tech.assets.view'],
+    ['text' => 'Administración', 'icon' => 'fas fa-cog',          'route' => 'admin.hub',          'can' => 'users.manage'],
+    ['text' => 'Respaldo',       'icon' => 'fas fa-database',     'route' => 'admin.backup.index', 'can' => 'users.manage', 'icon_color' => 'cyan'],
 
     /*
     |--------------------------------------------------------------------------
@@ -499,12 +502,12 @@ return [
             ],
         ],
         'Chartjs' => [
-            'active' => false,
+            'active' => true,
             'files' => [
                 [
                     'type' => 'js',
                     'asset' => false,
-                    'location' => '//cdnjs.cloudflare.com/ajax/libs/Chart.js/2.7.0/Chart.bundle.min.js',
+                    'location' => '//cdnjs.cloudflare.com/ajax/libs/Chart.js/2.9.4/Chart.bundle.min.js',
                 ],
             ],
         ],

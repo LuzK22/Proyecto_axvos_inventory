@@ -42,6 +42,45 @@ class ReportController extends Controller
         ]), $headers, 'reporte_activos_ti_' . now()->format('Ymd_His') . '.csv');
     }
 
+    /** Exporta activos TI con campos contables NIIF NIC 16 */
+    public function techNiifExport(Request $request)
+    {
+        $q    = $this->baseQuery('TI', $request);
+        $rows = $q->orderBy('internal_code')->get();
+
+        \App\Models\ExportLog::record('activos_ti_niif', 'csv', $request->all(), $rows->count());
+
+        $headers = [
+            'Cód. Inventario','Cód. Activo Fijo','Tipo','Marca','Modelo','Serial',
+            'Propiedad','Valor Compra','Fecha Compra','Proveedor',
+            'Vida Útil (años)','Método Depreciación','Valor Residual',
+            'Inicio Depreciación','Depreciación Anual','Valor en Libros',
+            'Cuenta PUC','Sucursal','Estado',
+        ];
+
+        return $this->csvResponse($rows->map(fn($a) => [
+            $a->internal_code,
+            $a->fixed_asset_code ?? 'PENDIENTE',
+            $a->type?->name,
+            $a->brand,
+            $a->model,
+            $a->serial,
+            $a->property_type,
+            $a->purchase_value     ? number_format($a->purchase_value, 2, '.', '') : '',
+            $a->purchase_date      ? $a->purchase_date->format('d/m/Y') : '',
+            $a->provider_name      ?? '',
+            $a->useful_life_years  ?? '',
+            $a->depreciation_method ?? '',
+            $a->residual_value     ? number_format($a->residual_value, 2, '.', '') : '',
+            $a->depreciation_start_date ? $a->depreciation_start_date->format('d/m/Y') : '',
+            $a->annual_depreciation ? number_format($a->annual_depreciation, 2, '.', '') : '',
+            $a->current_book_value  ? number_format($a->current_book_value, 2, '.', '') : '',
+            $a->account_code        ?? '',
+            $a->branch?->name,
+            $a->status?->name,
+        ]), $headers, 'niif_activos_ti_' . now()->format('Ymd_His') . '.csv');
+    }
+
     // ── REPORTES OTRO ───────────────────────────────────────────────────
 
     public function assets(Request $request)
@@ -78,6 +117,48 @@ class ReportController extends Controller
             $a->brand, $a->model, $a->status?->name, $a->branch?->name,
             $a->property_type, $a->created_at?->format('d/m/Y'),
         ]), $headers, 'reporte_otros_activos_' . now()->format('Ymd_His') . '.csv');
+    }
+
+    /** Exporta otros activos con campos contables NIIF NIC 16 */
+    public function assetsNiifExport(Request $request)
+    {
+        $q = $this->baseQuery('OTRO', $request);
+        if ($request->filled('subcategory')) {
+            $q->whereHas('type', fn($sq) => $sq->where('subcategory', $request->subcategory));
+        }
+        $rows = $q->orderBy('internal_code')->get();
+
+        \App\Models\ExportLog::record('otros_activos_niif', 'csv', $request->all(), $rows->count());
+
+        $headers = [
+            'Cód. Inventario','Cód. Activo Fijo','Tipo','Subcategoría','Nombre','Marca',
+            'Propiedad','Valor Compra','Fecha Compra','Proveedor',
+            'Vida Útil (años)','Método Depreciación','Valor Residual',
+            'Inicio Depreciación','Depreciación Anual','Valor en Libros',
+            'Cuenta PUC','Sucursal','Estado',
+        ];
+
+        return $this->csvResponse($rows->map(fn($a) => [
+            $a->internal_code,
+            $a->fixed_asset_code    ?? 'PENDIENTE',
+            $a->type?->name,
+            $a->type?->subcategory  ?? '',
+            $a->brand,
+            $a->model,
+            $a->property_type,
+            $a->purchase_value     ? number_format($a->purchase_value, 2, '.', '') : '',
+            $a->purchase_date      ? $a->purchase_date->format('d/m/Y') : '',
+            $a->provider_name      ?? '',
+            $a->useful_life_years  ?? '',
+            $a->depreciation_method ?? '',
+            $a->residual_value     ? number_format($a->residual_value, 2, '.', '') : '',
+            $a->depreciation_start_date ? $a->depreciation_start_date->format('d/m/Y') : '',
+            $a->annual_depreciation ? number_format($a->annual_depreciation, 2, '.', '') : '',
+            $a->current_book_value  ? number_format($a->current_book_value, 2, '.', '') : '',
+            $a->account_code        ?? '',
+            $a->branch?->name,
+            $a->status?->name,
+        ]), $headers, 'niif_otros_activos_' . now()->format('Ymd_His') . '.csv');
     }
 
     // ── REPORTE COLABORADORES CON ACTIVOS ──────────────────────────────

@@ -168,12 +168,21 @@ class DeletionRequestController extends Controller
                 'resolved_at' => now(),
             ]);
 
-            // Dejamos trazabilidad en el historial del activo
             AssetEvent::log($asset, 'baja', 'Baja', [
                 'notes' => "Baja aprobada. Motivo: {$deletionRequest->reason_label}. {$deletionRequest->notes}",
             ]);
 
             $asset->update(['status_id' => $bajaStatus->id]);
+
+            activity()
+                ->causedBy(auth()->user())
+                ->performedOn($asset)
+                ->withProperties([
+                    'activo'    => $asset->internal_code,
+                    'motivo'    => $deletionRequest->reason_label,
+                    'categoria' => $asset->type?->category,
+                ])
+                ->log("Baja APROBADA para activo {$asset->internal_code} — motivo: {$deletionRequest->reason_label}");
         });
 
         return back()->with('success', 'Solicitud aprobada. El activo fue dado de baja.');
@@ -195,12 +204,23 @@ class DeletionRequestController extends Controller
         }
 
         // El activo no se modifica; solo cerramos la solicitud con el motivo del rechazo
+        $asset = $deletionRequest->asset;
+
         $deletionRequest->update([
             'status'          => DeletionRequest::STATUS_REJECTED,
             'resolved_by'     => auth()->id(),
             'resolved_at'     => now(),
             'rejection_notes' => $request->rejection_notes,
         ]);
+
+        activity()
+            ->causedBy(auth()->user())
+            ->performedOn($asset)
+            ->withProperties([
+                'activo'  => $asset->internal_code,
+                'motivo_rechazo' => $request->rejection_notes,
+            ])
+            ->log("Baja RECHAZADA para activo {$asset->internal_code}");
 
         return back()->with('success', 'Solicitud rechazada.');
     }

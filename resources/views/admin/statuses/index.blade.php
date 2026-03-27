@@ -7,8 +7,8 @@
         <h1 class="m-0 font-weight-bold" style="color:#0d1b2a;">
             <i class="fas fa-tags mr-2" style="color:#00b4d8;"></i> Estados de Activos
         </h1>
-        <a href="{{ route('dashboard') }}" class="btn btn-sm btn-secondary">
-            <i class="fas fa-arrow-left mr-1"></i> Volver al Dashboard
+        <a href="{{ route('admin.hub') }}" class="btn btn-sm btn-secondary">
+            <i class="fas fa-arrow-left mr-1"></i> Administración
         </a>
     </div>
 @stop

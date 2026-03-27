@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\Activitylog\LogOptions;
@@ -23,10 +24,44 @@ class Collaborator extends Model
         'active',
     ];
 
-    protected $casts = [
-        'document' => 'encrypted',
-        'phone'    => 'encrypted',
-    ];
+    protected $casts = [];
+
+    /**
+     * Cédula: intenta descifrar, devuelve valor plano si falla.
+     * Permite migración gradual de valores sin cifrar.
+     */
+    protected function document(): Attribute
+    {
+        return Attribute::make(
+            get: function ($value) {
+                if (empty($value)) return $value;
+                try {
+                    return decrypt($value);
+                } catch (\Exception $e) {
+                    return $value; // valor plano (registros antiguos)
+                }
+            },
+            set: fn ($value) => !empty($value) ? encrypt($value) : $value,
+        );
+    }
+
+    /**
+     * Teléfono: misma lógica tolerante al cifrado.
+     */
+    protected function phone(): Attribute
+    {
+        return Attribute::make(
+            get: function ($value) {
+                if (empty($value)) return $value;
+                try {
+                    return decrypt($value);
+                } catch (\Exception $e) {
+                    return $value;
+                }
+            },
+            set: fn ($value) => !empty($value) ? encrypt($value) : $value,
+        );
+    }
 
     public function getActivitylogOptions(): LogOptions
     {

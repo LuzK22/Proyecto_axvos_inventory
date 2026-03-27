@@ -46,15 +46,20 @@ class AssetTypeController extends Controller
         // Generar código automático de 3 letras desde el nombre
         $code = strtoupper(substr(preg_replace('/[^a-zA-Z]/', '', $request->name), 0, 3));
 
-        AssetType::create([
+        $type = AssetType::create([
             'name'        => $request->name,
             'code'        => $code,
             'category'    => $request->category,
-            // Solo se guarda subcategoría para activos OTRO
             'subcategory' => $request->category === 'OTRO' ? $request->subcategory : null,
             'active'      => true,
             'created_by'  => auth()->id(),
         ]);
+
+        activity()
+            ->causedBy(auth()->user())
+            ->performedOn($type)
+            ->withProperties(['category' => $type->category, 'code' => $type->code])
+            ->log("Tipo de activo '{$type->name}' ({$type->category}) creado");
 
         return redirect()
             ->route('asset-types.index', $request->category)
@@ -82,10 +87,14 @@ class AssetTypeController extends Controller
 
         $assetType->update([
             'name'        => $request->name,
-            // Subcategoría solo aplica a OTRO
             'subcategory' => $assetType->category === 'OTRO' ? $request->subcategory : null,
             'active'      => $request->boolean('active', true),
         ]);
+
+        activity()
+            ->causedBy(auth()->user())
+            ->performedOn($assetType)
+            ->log("Tipo de activo '{$assetType->name}' actualizado");
 
         return redirect()
             ->route('asset-types.index', $assetType->category)
@@ -100,12 +109,24 @@ class AssetTypeController extends Controller
         if ($assetType->assets()->exists()) {
             $assetType->update(['active' => false]);
 
+            activity()
+                ->causedBy(auth()->user())
+                ->performedOn($assetType)
+                ->log("Tipo de activo '{$assetType->name}' desactivado (tiene activos relacionados)");
+
             return redirect()
                 ->route('asset-types.index', $assetType->category)
                 ->with('warning', 'El tipo tiene activos relacionados; se desactivó en lugar de eliminarse.');
         }
 
         $category = $assetType->category;
+        $name     = $assetType->name;
+
+        activity()
+            ->causedBy(auth()->user())
+            ->withProperties(['name' => $name, 'category' => $category])
+            ->log("Tipo de activo '{$name}' ({$category}) eliminado");
+
         $assetType->delete();
 
         return redirect()

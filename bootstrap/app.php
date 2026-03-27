@@ -18,7 +18,13 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
 
         $middleware->alias([
-            'require.2fa' => \App\Http\Middleware\RequiresTwoFactor::class,
+            // Middlewares propios
+            'require.2fa'         => \App\Http\Middleware\RequiresTwoFactor::class,
+            'require.consent'     => \App\Http\Middleware\RequiresConsent::class,
+            // Spatie Laravel Permission — OBLIGATORIO en Laravel 12 (sin Kernel.php)
+            'role'                => \Spatie\Permission\Middleware\RoleMiddleware::class,
+            'permission'          => \Spatie\Permission\Middleware\PermissionMiddleware::class,
+            'role_or_permission'  => \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

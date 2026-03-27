@@ -12,20 +12,25 @@ return [
         'source' => [
             'files' => [
                 /*
-                 * The list of directories and files that will be included in the backup.
+                 * Solo se respaldan archivos críticos del negocio.
+                 * El código fuente se gestiona con Git/GitHub.
                  */
                 'include' => [
-                    base_path(),
+                    storage_path('app/public'),   // actas PDF, logos, adjuntos
+                    base_path('.env'),             // configuración sensible
                 ],
 
                 /*
-                 * These directories and files will be excluded from the backup.
-                 *
-                 * Directories used by the backup process will automatically be excluded.
+                 * Excluir directorios que se pueden restaurar fácilmente.
                  */
                 'exclude' => [
                     base_path('vendor'),
                     base_path('node_modules'),
+                    storage_path('logs'),
+                    storage_path('framework/cache'),
+                    storage_path('framework/sessions'),
+                    storage_path('framework/views'),
+                    storage_path('app/backup-temp'),
                 ],
 
                 /*
@@ -152,6 +157,7 @@ return [
              */
             'disks' => [
                 'local',
+                // 'sftp_backup', // Activar cuando el proveedor entregue credenciales SFTP
             ],
         ],
 
@@ -290,7 +296,7 @@ return [
             /*
              * The number of days for which backups must be kept.
              */
-            'keep_all_backups_for_days' => 7,
+            'keep_all_backups_for_days' => 30,
 
             /*
              * After the "keep_all_backups_for_days" period is over, the most recent backup

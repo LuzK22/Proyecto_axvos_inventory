@@ -77,6 +77,16 @@ class SettingsController extends Controller
         // Limpiar caché de settings
         Cache::flush();
 
+        activity()
+            ->causedBy(auth()->user())
+            ->withProperties([
+                'empresa'          => $request->company_name,
+                '2fa_habilitado'   => $request->has('security_2fa_enabled') ? 'sí' : 'no',
+                '2fa_roles'        => implode(', ', $request->input('security_2fa_required_roles', [])),
+                '2fa_modo'         => $request->input('security_2fa_enforcement', 'required'),
+            ])
+            ->log('Configuración del sistema actualizada');
+
         return redirect()->route('admin.settings')
             ->with('success', 'Configuración guardada correctamente.');
     }

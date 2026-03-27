@@ -7,6 +7,8 @@ use App\Models\AssetEvent;
 use App\Models\AssetType;
 use App\Models\Branch;
 use App\Models\DeletionRequest;
+use App\Models\Assignment;
+use App\Models\Loan;
 use App\Models\Status;
 use Illuminate\Http\Request;
 
@@ -408,6 +410,124 @@ class AssetController extends Controller
     }
 
     public function assetsAssignments() { return view('assets.assignments.index'); }
-    public function assetsHistory()     { return view('assets.history.index'); }
+
+    public function assetsHistory(Request $request)
+    {
+        $eventsQuery = AssetEvent::query()
+            ->whereHas('asset.type', fn($q) => $q->where('category', 'OTRO'))
+            ->with(['asset.type', 'user', 'collaborator', 'assignment']);
+
+        if ($request->filled('event_type')) {
+            $eventsQuery->where('event_type', $request->event_type);
+        }
+
+        if ($request->filled('q')) {
+            $term = $request->string('q')->trim()->value();
+            $eventsQuery->where(function ($q) use ($term) {
+                $q->where('notes', 'like', "%{$term}%")
+                    ->orWhereHas('asset', fn($asset) => $asset
+                        ->where('internal_code', 'like', "%{$term}%")
+                        ->orWhere('brand', 'like', "%{$term}%")
+                        ->orWhere('model', 'like', "%{$term}%"));
+            });
+        }
+
+        $events = $eventsQuery->orderByDesc('created_at')
+            ->paginate(20, ['*'], 'events_page')
+            ->withQueryString();
+
+        $assets = Asset::query()
+            ->with(['type', 'branch', 'status'])
+            ->whereHas('type', fn($q) => $q->where('category', 'OTRO'))
+            ->when($request->filled('q'), function ($q) use ($request) {
+                $term = $request->string('q')->trim()->value();
+                $q->where(function ($sub) use ($term) {
+                    $sub->where('internal_code', 'like', "%{$term}%")
+                        ->orWhere('brand', 'like', "%{$term}%")
+                        ->orWhere('model', 'like', "%{$term}%")
+                        ->orWhere('serial', 'like', "%{$term}%");
+                });
+            })
+            ->orderByDesc('created_at')
+            ->paginate(15, ['*'], 'assets_page')
+            ->withQueryString();
+
+        $assignmentsHistory = Assignment::query()
+            ->with(['collaborator', 'area', 'assignedBy', 'assignmentAssets.asset.type'])
+            ->where(function ($query) {
+                $query->where('asset_category', 'OTRO')
+                    ->orWhere(function ($legacy) {
+                        $legacy->whereNull('asset_category')
+                            ->whereHas('assignmentAssets.asset.type', fn($type) => $type->where('category', 'OTRO'));
+                    });
+            })
+            ->when($request->filled('q'), function ($q) use ($request) {
+                $term = $request->string('q')->trim()->value();
+                $q->where(function ($sub) use ($term) {
+                    $sub->whereHas('collaborator', fn($c) => $c->where('full_name', 'like', "%{$term}%"))
+                        ->orWhereHas('area', fn($a) => $a->where('name', 'like', "%{$term}%"));
+                });
+            })
+            ->orderByDesc('assignment_date')
+            ->paginate(15, ['*'], 'assignments_page')
+            ->withQueryString();
+
+        $activeAssignmentsCount = Assignment::query()
+            ->where(function ($query) {
+                $query->where('asset_category', 'OTRO')
+                    ->orWhere(function ($legacy) {
+                        $legacy->whereNull('asset_category')
+                            ->whereHas('assignmentAssets.asset.type', fn($type) => $type->where('category', 'OTRO'));
+                    });
+            })
+            ->where('status', 'activa')
+            ->count();
+
+        $activeLoansCount = Loan::query()
+            ->where(function ($query) {
+                $query->where('category', 'OTRO')
+                    ->orWhere(function ($legacy) {
+                        $legacy->whereNull('category')
+                            ->whereHas('asset.type', fn($type) => $type->where('category', 'OTRO'));
+                    });
+            })
+            ->whereIn('status', ['activo', 'vencido'])
+            ->count();
+
+        $totalAssetsCount = Asset::query()
+            ->whereHas('type', fn($q) => $q->where('category', 'OTRO'))
+            ->count();
+
+        $availableAssetsCount = Asset::query()
+            ->whereHas('type', fn($q) => $q->where('category', 'OTRO'))
+            ->whereHas('status', fn($q) => $q->where('name', 'Disponible'))
+            ->count();
+
+        $eventTypes = collect(AssetEvent::TYPES)->only([
+            'creacion',
+            'asignacion',
+            'devolucion',
+            'prestamo',
+            'actualizacion',
+            'traslado',
+            'mantenimiento',
+            'garantia',
+            'baja',
+            'donacion',
+            'venta',
+        ]);
+
+        return view('assets.history.index', compact(
+            'events',
+            'assets',
+            'assignmentsHistory',
+            'eventTypes',
+            'totalAssetsCount',
+            'activeAssignmentsCount',
+            'activeLoansCount',
+            'availableAssetsCount'
+        ));
+    }
+
     public function assetsDisposals()   { return view('assets.disposals.hub'); }
 }
