@@ -120,7 +120,7 @@
 
             @can('tech.history.view')
             <div class="col-md-4 mb-3">
-                <a href="{{ route('tech.history.index') }}" class="hub-btn"
+                <a href="{{ route('tech.assets.history.index') }}" class="hub-btn"
                    style="background:linear-gradient(135deg,#1e293b,#334155);">
                     <div class="hub-btn-icon"><i class="fas fa-history"></i></div>
                     <div class="hub-btn-text">

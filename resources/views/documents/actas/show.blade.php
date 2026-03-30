@@ -67,10 +67,18 @@
                         <strong>{{ ucfirst($acta->acta_type) }} / {{ $acta->asset_category_label }}</strong>
                     </div>
                     <div class="col-sm-4">
+                        <small class="text-muted d-block">Destino</small>
+                        <strong>{{ \App\Models\Assignment::destinationLabel($acta->assignment->destination_type ?? 'collaborator') }}</strong>
+                    </div>
+                    <div class="col-sm-4">
+                        <small class="text-muted d-block">Receptor</small>
+                        <strong>{{ $acta->assignment->recipient_name }}</strong>
+                    </div>
+                    <div class="col-sm-4 mt-2">
                         <small class="text-muted d-block">Colaborador</small>
                         <strong>{{ $acta->assignment->collaborator->full_name ?? '—' }}</strong>
                     </div>
-                    <div class="col-sm-4">
+                    <div class="col-sm-4 mt-2">
                         <small class="text-muted d-block">Fecha generación</small>
                         <strong>{{ $acta->created_at->format('d/m/Y H:i') }}</strong>
                     </div>
@@ -206,6 +214,25 @@
                 @if($acta->xlsx_draft_path)
                     <a href="{{ route('actas.excel.draft.download', $acta) }}" class="btn btn-sm btn-outline-success btn-block mb-2">
                         <i class="fas fa-download mr-1"></i> Descargar borrador
+                    </a>
+                @endif
+
+                @if(!in_array($acta->status, [\App\Models\Acta::STATUS_COMPLETADA, \App\Models\Acta::STATUS_ANULADA]))
+                    <form method="POST" action="{{ route('actas.excel.final.upload', $acta) }}" enctype="multipart/form-data" class="mb-2">
+                        @csrf
+                        <div class="custom-file mb-2">
+                            <input type="file" name="excel_final" class="custom-file-input" id="excelFinalFile" accept=".xlsx" required>
+                            <label class="custom-file-label" for="excelFinalFile">Subir Excel final editado</label>
+                        </div>
+                        <button class="btn btn-sm btn-outline-primary btn-block">
+                            <i class="fas fa-upload mr-1"></i> Guardar Excel final
+                        </button>
+                    </form>
+                @endif
+
+                @if($acta->xlsx_final_path)
+                    <a href="{{ route('actas.excel.final.download', $acta) }}" class="btn btn-sm btn-outline-primary btn-block mb-2">
+                        <i class="fas fa-file-download mr-1"></i> Descargar Excel final
                     </a>
                 @endif
 

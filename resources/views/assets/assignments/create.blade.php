@@ -134,6 +134,12 @@
                 <div class="px-3 py-2 border-bottom">
                     <input type="text" id="assetSearch" class="form-control form-control-sm"
                            placeholder="Buscar por codigo, tipo, nombre...">
+                    <select id="assetSubcategoryFilter" class="form-control form-control-sm mt-2">
+                        <option value="">Todas las subcategorias</option>
+                        @foreach($assets->pluck('type.subcategory')->filter()->unique()->sort()->values() as $sub)
+                            <option value="{{ strtolower($sub) }}">{{ $sub }}</option>
+                        @endforeach
+                    </select>
                 </div>
                 <div style="max-height:360px;overflow-y:auto;">
                     <table class="table table-sm table-hover mb-0">
@@ -148,7 +154,7 @@
                         </thead>
                         <tbody id="assetTableBody">
                             @forelse($assets as $asset)
-                            <tr class="asset-row" data-search="{{ strtolower($asset->internal_code . ' ' . $asset->type?->name . ' ' . $asset->type?->subcategory . ' ' . $asset->brand . ' ' . $asset->model) }}">
+                            <tr class="asset-row" data-search="{{ strtolower($asset->internal_code . ' ' . $asset->type?->name . ' ' . $asset->type?->subcategory . ' ' . $asset->brand . ' ' . $asset->model) }}" data-subcategory="{{ strtolower($asset->type?->subcategory ?? '') }}">
                                 <td class="text-center">
                                     <input type="checkbox" name="assets[]" value="{{ $asset->id }}"
                                            class="asset-check"
@@ -316,12 +322,23 @@ document.querySelectorAll('.asset-check').forEach(cb => cb.addEventListener('cha
 updateCount();
 
 document.getElementById('assetSearch').addEventListener('input', function() {
-    const q = this.value.toLowerCase();
-    document.querySelectorAll('.asset-row').forEach(row => {
-        row.style.display = row.dataset.search.includes(q) ? '' : 'none';
-    });
+    applyAssetFilters();
 });
 
+document.getElementById('assetSubcategoryFilter')?.addEventListener('change', applyAssetFilters);
+
+function applyAssetFilters() {
+    const q = (document.getElementById('assetSearch')?.value || '').toLowerCase();
+    const sub = (document.getElementById('assetSubcategoryFilter')?.value || '').toLowerCase();
+    document.querySelectorAll('.asset-row').forEach(row => {
+        const matchesQ = row.dataset.search.includes(q);
+        const rowSub = (row.dataset.subcategory || '').toLowerCase();
+        const matchesSub = !sub || rowSub === sub;
+        row.style.display = (matchesQ && matchesSub) ? '' : 'none';
+    });
+}
+
 setDestination(document.getElementById('destinationType').value || 'collaborator');
+applyAssetFilters();
 </script>
 @stop

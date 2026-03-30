@@ -26,6 +26,8 @@ class User extends Authenticatable
         'password_changed_at',
         'failed_login_attempts',
         'locked_until',
+        'default_signature_type',
+        'default_signature_data',
     ];
 
     protected $hidden = [
@@ -190,4 +192,3 @@ class User extends Authenticatable
         return count($this->twoFactorRecoveryCodes()) > 0;
     }
 }
-

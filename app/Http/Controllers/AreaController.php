@@ -16,7 +16,7 @@ class AreaController extends Controller
 
     public function create()
     {
-        $branches = Branch::where('active', true)->orderBy('name')->get();
+        $branches = Branch::orderByDesc('active')->orderBy('name')->get();
         return view('areas.create', compact('branches'));
     }
 
@@ -40,7 +40,7 @@ class AreaController extends Controller
 
     public function edit(Area $area)
     {
-        $branches = Branch::where('active', true)->orderBy('name')->get();
+        $branches = Branch::orderByDesc('active')->orderBy('name')->get();
         return view('areas.edit', compact('area', 'branches'));
     }
 

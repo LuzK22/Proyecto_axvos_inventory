@@ -61,11 +61,21 @@ class AssetController extends Controller
             $query->where('branch_id', $branch);
         }
 
+        if ($subcategory = $request->input('subcategory')) {
+            $query->whereHas('type', fn($t) => $t->where('subcategory', $subcategory));
+        }
+
         $assets   = $query->orderBy('id', 'desc')->get();
         $branches = Branch::where('active', true)->orderBy('name')->get();
         $statuses = Status::orderBy('name')->get();
+        $subcategories = AssetType::where('category', 'TI')
+            ->whereNotNull('subcategory')
+            ->distinct()
+            ->pluck('subcategory')
+            ->sort()
+            ->values();
 
-        return view('tech.assets.index', compact('assets', 'branches', 'statuses'));
+        return view('tech.assets.index', compact('assets', 'branches', 'statuses', 'subcategories'));
     }
 
     /* =========================================================
@@ -207,7 +217,83 @@ class AssetController extends Controller
     /* =========================================================
      | PLACEHOLDERS — módulos pendientes de desarrollo
      ========================================================= */
-    public function history()   { return view('tech.history.index'); }
+    public function techAssetsHistory(Request $request)
+    {
+        $eventsQuery = AssetEvent::query()
+            ->whereHas('asset.type', fn($q) => $q->where('category', 'TI'))
+            ->with(['asset.type', 'asset.status', 'user']);
+
+        if ($request->filled('event_type')) {
+            $eventsQuery->where('event_type', $request->event_type);
+        }
+
+        if ($request->filled('q')) {
+            $term = $request->string('q')->trim()->value();
+            $eventsQuery->where(function ($q) use ($term) {
+                $q->where('notes', 'like', "%{$term}%")
+                    ->orWhereHas('asset', fn($asset) => $asset
+                        ->where('internal_code', 'like', "%{$term}%")
+                        ->orWhere('brand', 'like', "%{$term}%")
+                        ->orWhere('model', 'like', "%{$term}%")
+                        ->orWhere('serial', 'like', "%{$term}%"));
+            });
+        }
+
+        if ($request->filled('subcategory')) {
+            $sub = $request->string('subcategory')->trim()->value();
+            $eventsQuery->whereHas('asset.type', fn($t) => $t->where('subcategory', $sub));
+        }
+
+        $events = $eventsQuery->orderByDesc('created_at')
+            ->paginate(20, ['*'], 'events_page')
+            ->withQueryString();
+
+        $assets = Asset::query()
+            ->with(['type', 'branch', 'status'])
+            ->whereHas('type', fn($q) => $q->where('category', 'TI'))
+            ->when($request->filled('q'), function ($q) use ($request) {
+                $term = $request->string('q')->trim()->value();
+                $q->where(function ($sub) use ($term) {
+                    $sub->where('internal_code', 'like', "%{$term}%")
+                        ->orWhere('brand', 'like', "%{$term}%")
+                        ->orWhere('model', 'like', "%{$term}%")
+                        ->orWhere('serial', 'like', "%{$term}%")
+                        ->orWhere('asset_tag', 'like', "%{$term}%")
+                        ->orWhere('fixed_asset_code', 'like', "%{$term}%");
+                });
+            })
+            ->when($request->filled('subcategory'), function ($q) use ($request) {
+                $sub = $request->string('subcategory')->trim()->value();
+                $q->whereHas('type', fn($t) => $t->where('subcategory', $sub));
+            })
+            ->orderByDesc('created_at')
+            ->paginate(15, ['*'], 'assets_page')
+            ->withQueryString();
+
+        $eventTypes = collect(AssetEvent::TYPES)->only([
+            'creacion',
+            'asignacion',
+            'devolucion',
+            'prestamo',
+            'actualizacion',
+            'traslado',
+            'mantenimiento',
+            'garantia',
+            'baja',
+            'donacion',
+            'venta',
+        ]);
+
+        $subcategories = AssetType::where('category', 'TI')
+            ->whereNotNull('subcategory')
+            ->distinct()
+            ->pluck('subcategory')
+            ->sort()
+            ->values();
+
+        return view('tech.assets.history', compact('events', 'assets', 'eventTypes', 'subcategories'));
+    }
+
     public function disposals() { return view('tech.disposals.hub'); }
 
     /* =========================================================
@@ -432,6 +518,11 @@ class AssetController extends Controller
             });
         }
 
+        if ($request->filled('subcategory')) {
+            $sub = $request->string('subcategory')->trim()->value();
+            $eventsQuery->whereHas('asset.type', fn($t) => $t->where('subcategory', $sub));
+        }
+
         $events = $eventsQuery->orderByDesc('created_at')
             ->paginate(20, ['*'], 'events_page')
             ->withQueryString();
@@ -448,6 +539,10 @@ class AssetController extends Controller
                         ->orWhere('serial', 'like', "%{$term}%");
                 });
             })
+            ->when($request->filled('subcategory'), function ($q) use ($request) {
+                $sub = $request->string('subcategory')->trim()->value();
+                $q->whereHas('type', fn($t) => $t->where('subcategory', $sub));
+            })
             ->orderByDesc('created_at')
             ->paginate(15, ['*'], 'assets_page')
             ->withQueryString();
@@ -459,6 +554,7 @@ class AssetController extends Controller
                     ->orWhere(function ($legacy) {
                         $legacy->whereNull('asset_category')
                             ->whereHas('assignmentAssets.asset.type', fn($type) => $type->where('category', 'OTRO'));
+                        $legacy->whereDoesntHave('assignmentAssets.asset.type', fn($type) => $type->where('category', 'TI'));
                     });
             })
             ->when($request->filled('q'), function ($q) use ($request) {
@@ -478,6 +574,7 @@ class AssetController extends Controller
                     ->orWhere(function ($legacy) {
                         $legacy->whereNull('asset_category')
                             ->whereHas('assignmentAssets.asset.type', fn($type) => $type->where('category', 'OTRO'));
+                        $legacy->whereDoesntHave('assignmentAssets.asset.type', fn($type) => $type->where('category', 'TI'));
                     });
             })
             ->where('status', 'activa')
@@ -517,11 +614,19 @@ class AssetController extends Controller
             'venta',
         ]);
 
+        $subcategories = AssetType::where('category', 'OTRO')
+            ->whereNotNull('subcategory')
+            ->distinct()
+            ->pluck('subcategory')
+            ->sort()
+            ->values();
+
         return view('assets.history.index', compact(
             'events',
             'assets',
             'assignmentsHistory',
             'eventTypes',
+            'subcategories',
             'totalAssetsCount',
             'activeAssignmentsCount',
             'activeLoansCount',

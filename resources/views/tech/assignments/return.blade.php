@@ -97,7 +97,8 @@
                                 <td>
                                     <input type="checkbox" name="asset_ids[]"
                                            value="{{ $aa->asset_id }}"
-                                           class="return-checkbox">
+                                           class="return-checkbox"
+                                           {{ in_array($aa->asset_id, old('asset_ids', $preselectedAssetIds ?? [])) ? 'checked' : '' }}>
                                 </td>
                                 <td><code>{{ $aa->asset->internal_code }}</code></td>
                                 <td>{{ $aa->asset->type?->name }}</td>

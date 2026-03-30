@@ -88,6 +88,19 @@
             </div>
             @endcan
 
+            @can('assets.assign')
+            <div class="col-md-4 mb-3">
+                <a href="{{ route('areas.index') }}" class="hub-btn"
+                   style="background:linear-gradient(135deg,#1d4ed8,#2563eb);">
+                    <div class="hub-btn-icon"><i class="fas fa-map-marked-alt"></i></div>
+                    <div class="hub-btn-text">
+                        <strong>Areas / Pools</strong>
+                        <small>Gestion de destinos compartidos</small>
+                    </div>
+                </a>
+            </div>
+            @endcan
+
         </div>
     </div>
 </div>

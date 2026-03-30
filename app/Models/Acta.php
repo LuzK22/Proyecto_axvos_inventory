@@ -18,6 +18,7 @@ class Acta extends Model
         'acta_number',
         'acta_type',
         'asset_category',
+        'asset_scope',
         'status',
         'pdf_path',
         'xlsx_draft_path',
@@ -31,6 +32,7 @@ class Acta extends Model
     protected $casts = [
         'sent_at'       => 'datetime',
         'completed_at'  => 'datetime',
+        'asset_scope'   => 'array',
     ];
 
     // ─── Constantes de estado ──────────────────────────────────
@@ -252,25 +254,10 @@ class Acta extends Model
             ?? ($assignment->area ? ('Área: ' . $assignment->area->name) : '—');
         $recipientEmail = $assignment->collaborator?->email; // puede ser null si es área
 
-        ActaSignature::create([
-            'acta_id'          => $acta->id,
-            'signer_role'      => 'collaborator',
-            'signer_name'      => $recipientName,
-            'signer_email'     => $recipientEmail,
-            'token'            => ActaSignature::generateToken(),
-            'token_expires_at' => now()->addDays(7),
-        ]);
+        ActaSignature::createCollaboratorSignature($acta, $recipientName, $recipientEmail, 7);
 
         // Firma del responsable (usuario autenticado que genera)
-        ActaSignature::create([
-            'acta_id'          => $acta->id,
-            'signer_role'      => 'responsible',
-            'signer_name'      => $responsibleUser->name,
-            'signer_email'     => $responsibleUser->email,
-            'signer_user_id'   => $responsibleUser->id,
-            'token'            => ActaSignature::generateToken(),
-            'token_expires_at' => now()->addDays(7),
-        ]);
+        ActaSignature::createResponsibleSignature($acta, $responsibleUser, 7);
 
         return $acta;
     }
@@ -314,10 +301,23 @@ class Acta extends Model
     public function scopedAssignmentAssets()
     {
         $category = strtoupper($this->asset_category ?? 'TI');
+        $scopeIds = collect($this->asset_scope['assignment_asset_ids'] ?? [])
+            ->map(fn($id) => (int) $id)
+            ->filter()
+            ->values();
 
         $query = $this->assignment->assignmentAssets()
-            ->whereNull('returned_at')
             ->with('asset.type');
+
+        if ($scopeIds->isNotEmpty()) {
+            $query->whereIn('id', $scopeIds->all());
+        }
+
+        if ($this->acta_type === self::TYPE_DEVOLUCION) {
+            $query->whereNotNull('returned_at');
+        } else {
+            $query->whereNull('returned_at');
+        }
 
         if (in_array($category, ['TI', 'OTRO'], true)) {
             $query->whereHas('asset.type', fn ($q) => $q->where('category', $category));

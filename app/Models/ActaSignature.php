@@ -68,4 +68,35 @@ class ActaSignature extends Model
     {
         return bin2hex(random_bytes(24));
     }
+
+    public static function createCollaboratorSignature(Acta $acta, string $name, ?string $email = null, int $expiresDays = 7): self
+    {
+        return self::create([
+            'acta_id'          => $acta->id,
+            'signer_role'      => 'collaborator',
+            'signer_name'      => $name,
+            'signer_email'     => $email,
+            'token'            => self::generateToken(),
+            'token_expires_at' => now()->addDays($expiresDays),
+        ]);
+    }
+
+    public static function createResponsibleSignature(Acta $acta, User $user, int $expiresDays = 7): self
+    {
+        $hasDefaultSignature = !empty($user->default_signature_data);
+
+        return self::create([
+            'acta_id'          => $acta->id,
+            'signer_role'      => 'responsible',
+            'signer_name'      => $user->name,
+            'signer_email'     => $user->email,
+            'signer_user_id'   => $user->id,
+            'token'            => $hasDefaultSignature ? null : self::generateToken(),
+            'token_expires_at' => $hasDefaultSignature ? null : now()->addDays($expiresDays),
+            'signed_at'        => $hasDefaultSignature ? now() : null,
+            'signature_type'   => $hasDefaultSignature ? ($user->default_signature_type ?: 'drawn') : null,
+            'signature_data'   => $hasDefaultSignature ? $user->default_signature_data : null,
+            'signed_ip'        => $hasDefaultSignature ? 'AUTO_PROFILE' : null,
+        ]);
+    }
 }

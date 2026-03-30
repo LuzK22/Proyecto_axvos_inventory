@@ -1,13 +1,13 @@
 @extends('adminlte::page')
 
-@section('title', 'Historial de Activos TI')
+@section('title', 'Historial de Asignaciones TI')
 
 @section('content_header')
     <nav aria-label="breadcrumb">
         <ol class="breadcrumb">
             <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">Dashboard</a></li>
-            <li class="breadcrumb-item"><a href="{{ route('tech.assets.hub') }}">Activos TI</a></li>
-            <li class="breadcrumb-item active">Historial</li>
+            <li class="breadcrumb-item"><a href="{{ route('tech.assignments.hub') }}">Asignaciones TI</a></li>
+            <li class="breadcrumb-item active">Historial de Asignaciones</li>
         </ol>
     </nav>
 @stop
@@ -15,6 +15,13 @@
 @section('content')
 
 {{-- Filtros --}}
+<div class="alert alert-light border mb-3 py-2">
+    <small>
+        <strong>Alcance:</strong> este módulo muestra solo el historial de asignaciones TI (entregas/devoluciones).
+        El historial de bajas se gestiona en <strong>Bajas TI</strong>.
+    </small>
+</div>
+
 <div class="card card-outline card-secondary">
     <div class="card-header">
         <h3 class="card-title"><i class="fas fa-filter mr-1"></i> Filtros</h3>
@@ -73,7 +80,7 @@
                 <thead class="thead-light">
                     <tr>
                         <th>#</th>
-                        <th>Colaborador</th>
+                        <th>Receptor</th>
                         <th>Modalidad</th>
                         <th>Activos</th>
                         <th>Fecha Asignación</th>
@@ -87,14 +94,21 @@
                         <tr>
                             <td><small class="text-muted">#{{ $assignment->id }}</small></td>
                             <td>
-                                <a href="{{ route('collaborators.show', $assignment->collaborator) }}">
-                                    {{ $assignment->collaborator->full_name }}
-                                </a><br>
-                                <small class="text-muted">CC {{ $assignment->collaborator->document }}</small>
+                                @if($assignment->collaborator)
+                                    <a href="{{ route('collaborators.show', $assignment->collaborator) }}">
+                                        {{ $assignment->collaborator->full_name }}
+                                    </a><br>
+                                    <small class="text-muted">CC {{ $assignment->collaborator->document }}</small>
+                                @else
+                                    <span class="font-weight-bold text-dark">
+                                        {{ $assignment->area?->name ? 'Área: ' . $assignment->area->name : 'Sin colaborador' }}
+                                    </span><br>
+                                    <small class="text-muted">{{ \App\Models\Assignment::destinationLabel($assignment->destination_type ?? 'collaborator') }}</small>
+                                @endif
                             </td>
                             <td>
                                 @php
-                                    $mod = $assignment->collaborator->modalidad_trabajo ?? 'presencial';
+                                    $mod = $assignment->collaborator->modalidad_trabajo ?? ($assignment->work_modality ?? 'presencial');
                                     $bc = match($mod) { 'remoto' => 'badge-info', 'hibrido' => 'badge-warning text-dark', default => 'badge-success' };
                                     $ml = match($mod) { 'remoto' => 'Remoto', 'hibrido' => 'Híbrido', default => 'Presencial' };
                                 @endphp

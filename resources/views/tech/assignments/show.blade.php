@@ -96,6 +96,17 @@
                     </dd>
                     <dt class="col-sm-6">Fecha:</dt>
                     <dd class="col-sm-6">{{ $assignment->assignment_date->format('d/m/Y') }}</dd>
+                    <dt class="col-sm-6">Destino:</dt>
+                    <dd class="col-sm-6">
+                        <i class="fas {{ $assignment->destination_icon ?? 'fa-user' }} mr-1 text-muted"></i>
+                        {{ \App\Models\Assignment::destinationLabel($assignment->destination_type ?? 'collaborator') }}
+                    </dd>
+                    @if(in_array($assignment->destination_type, ['area', 'pool'], true))
+                        <dt class="col-sm-6">Area destino:</dt>
+                        <dd class="col-sm-6">{{ $assignment->area?->name ?? '-' }}</dd>
+                    @endif
+                    <dt class="col-sm-6">Receptor:</dt>
+                    <dd class="col-sm-6">{{ $assignment->recipient_name }}</dd>
                     <dt class="col-sm-6">Registrado por:</dt>
                     <dd class="col-sm-6">{{ $assignment->assignedBy?->name ?? '-' }}</dd>
                     @if($assignment->notes)

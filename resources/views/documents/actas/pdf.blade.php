@@ -152,6 +152,12 @@
                 <td>{{ $coll->document ?? '—' }}</td>
             </tr>
             <tr>
+                <td>Destino</td>
+                <td>{{ \App\Models\Assignment::destinationLabel($acta->assignment->destination_type ?? 'collaborator') }}</td>
+                <td>Receptor</td>
+                <td>{{ $acta->assignment->recipient_name }}</td>
+            </tr>
+            <tr>
                 <td>Cargo / Posición</td>
                 <td>{{ $coll->position ?? '—' }}</td>
                 <td>Área</td>
@@ -173,10 +179,11 @@
             default => 'Activos TI',
         };
         $assets    = $acta->scopedAssignmentAssets();
+        $assetsTitle = $acta->acta_type === \App\Models\Acta::TYPE_DEVOLUCION ? 'Devueltos' : 'Entregados';
         $showTechColumns = $assets->contains(fn($aa) => strtoupper($aa->asset?->type?->category ?? '') === 'TI');
     @endphp
     <div class="section">
-        <div class="section-title">{{ $catLabel }} Entregados</div>
+        <div class="section-title">{{ $catLabel }} {{ $assetsTitle }}</div>
         <table class="assets-table">
             <thead>
                 <tr>

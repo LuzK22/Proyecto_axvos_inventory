@@ -48,11 +48,20 @@
                     @endforeach
                 </select>
             </div>
-            <div class="col-md-2">
+            <div class="col-md-2 mb-2 mb-md-0">
+                <label class="small font-weight-bold text-muted mb-1">Subcategoría</label>
+                <select name="subcategory" class="form-control form-control-sm">
+                    <option value="">Todas</option>
+                    @foreach(($subcategories ?? collect()) as $sub)
+                        <option value="{{ $sub }}" {{ request('subcategory') === $sub ? 'selected' : '' }}>{{ $sub }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="col-md-12 col-lg-2">
                 <button type="submit" class="btn btn-sm btn-primary w-100">
                     <i class="fas fa-search mr-1"></i> Buscar
                 </button>
-                @if(request()->hasAny(['q','status','branch']))
+                @if(request()->hasAny(['q','status','branch','subcategory']))
                     <a href="{{ route('tech.assets.index') }}" class="btn btn-sm btn-link w-100 p-0 mt-1 text-muted small">
                         <i class="fas fa-times mr-1"></i> Limpiar filtros
                     </a>
@@ -81,6 +90,7 @@
                     <tr>
                         <th>Código</th>
                         <th>Tipo</th>
+                        <th>Subcategoría</th>
                         <th>Marca / Modelo</th>
                         <th>Serial</th>
                         <th>Propiedad</th>
@@ -98,6 +108,13 @@
                                 </a>
                             </td>
                             <td>{{ $asset->type->name ?? '-' }}</td>
+                            <td>
+                                @if($asset->type?->subcategory)
+                                    <span class="badge badge-light border">{{ $asset->type->subcategory }}</span>
+                                @else
+                                    <span class="text-muted">-</span>
+                                @endif
+                            </td>
                             <td>
                                 {{ $asset->brand }}<br>
                                 <small class="text-muted">{{ $asset->model }}</small>
@@ -142,7 +159,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="8" class="text-center text-muted py-4">
+                            <td colspan="9" class="text-center text-muted py-4">
                                 <i class="fas fa-inbox fa-2x d-block mb-2 opacity-50"></i>
                                 No hay activos TI registrados
                             </td>

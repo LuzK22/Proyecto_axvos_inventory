@@ -33,6 +33,210 @@
         </a>
     </div>
 </div>
+
+{{-- Modal: Retirar --}}
+<div class="modal fade" id="modalRetire" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <form id="formRetire" method="POST">@csrf
+            <div class="modal-content">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title">Retirar Activo</h5>
+                    <button type="button" class="close text-white" data-dismiss="modal"><span>&times;</span></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-2">Activo <strong id="retireCode"></strong> quedara Disponible.</p>
+                    <textarea name="notes" class="form-control" rows="2" placeholder="Observaciones (opcional)"></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-success btn-sm">Confirmar</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+{{-- Modal: Mantenimiento --}}
+<div class="modal fade" id="modalMaintenance" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <form id="formMaintenance" method="POST">@csrf
+            <div class="modal-content">
+                <div class="modal-header bg-warning">
+                    <h5 class="modal-title">Enviar a Mantenimiento</h5>
+                    <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-2">Activo <strong id="maintenanceCode"></strong></p>
+                    <textarea name="notes" class="form-control" rows="3" placeholder="Detalle de falla (opcional)"></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-warning btn-sm">Confirmar</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+{{-- Modal: Garantia --}}
+<div class="modal fade" id="modalWarranty" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <form id="formWarranty" method="POST">@csrf
+            <div class="modal-content">
+                <div class="modal-header bg-info text-white">
+                    <h5 class="modal-title">Enviar a Garantia</h5>
+                    <button type="button" class="close text-white" data-dismiss="modal"><span>&times;</span></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-2">Activo <strong id="warrantyCode"></strong></p>
+                    <input type="text" name="provider" class="form-control mb-2" placeholder="Proveedor (opcional)">
+                    <textarea name="notes" class="form-control" rows="2" placeholder="Observaciones (opcional)"></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-info btn-sm text-white">Confirmar</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+{{-- Modal: Traslado --}}
+<div class="modal fade" id="modalTransfer" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <form id="formTransfer" method="POST">@csrf
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title">Trasladar de Sede</h5>
+                    <button type="button" class="close text-white" data-dismiss="modal"><span>&times;</span></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-2">Activo <strong id="transferCode"></strong></p>
+                    <select name="to_branch_id" class="form-control mb-2" required>
+                        <option value="">Seleccione sede destino...</option>
+                        @foreach(\App\Models\Branch::where('active', true)->orderBy('name')->get() as $branch)
+                            <option value="{{ $branch->id }}">{{ $branch->name }} — {{ $branch->city }}</option>
+                        @endforeach
+                    </select>
+                    <textarea name="notes" class="form-control" rows="2" placeholder="Observaciones (opcional)"></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary btn-sm">Confirmar</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+{{-- Modal: Baja --}}
+<div class="modal fade" id="modalBaja" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <form id="formBaja" method="POST">@csrf
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title">Dar de Baja</h5>
+                    <button type="button" class="close text-white" data-dismiss="modal"><span>&times;</span></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-2">Activo <strong id="bajaCode"></strong></p>
+                    <select name="reason" class="form-control mb-2" required>
+                        <option value="">Seleccione motivo...</option>
+                        <option value="danado">Danado / Inservible</option>
+                        <option value="obsoleto">Obsoleto</option>
+                        <option value="perdido">Perdido / Extraviado</option>
+                        <option value="otro">Otro</option>
+                    </select>
+                    <textarea name="notes" class="form-control" rows="3" required placeholder="Descripcion"></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-danger btn-sm">Confirmar</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+{{-- Modal: Donacion --}}
+<div class="modal fade" id="modalDonation" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <form id="formDonation" method="POST">@csrf
+            <div class="modal-content">
+                <div class="modal-header bg-dark text-white">
+                    <h5 class="modal-title">Donar Activo</h5>
+                    <button type="button" class="close text-white" data-dismiss="modal"><span>&times;</span></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-2">Activo <strong id="donationCode"></strong></p>
+                    <input type="text" name="recipient" class="form-control mb-2" required placeholder="Entidad / Receptor">
+                    <textarea name="notes" class="form-control" rows="2" placeholder="Observaciones (opcional)"></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-dark btn-sm">Confirmar</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+{{-- Modal: Venta --}}
+<div class="modal fade" id="modalSale" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <form id="formSale" method="POST">@csrf
+            <div class="modal-content">
+                <div class="modal-header bg-secondary text-white">
+                    <h5 class="modal-title">Vender Activo</h5>
+                    <button type="button" class="close text-white" data-dismiss="modal"><span>&times;</span></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-2">Activo <strong id="saleCode"></strong></p>
+                    <input type="text" name="buyer" class="form-control mb-2" required placeholder="Comprador">
+                    <input type="number" step="0.01" name="sale_value" class="form-control mb-2" placeholder="Valor de venta (opcional)">
+                    <textarea name="notes" class="form-control" rows="2" placeholder="Observaciones (opcional)"></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-secondary btn-sm">Confirmar</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+@stop
+
+@section('js')
+<script>
+function openModal(type, assetId, assetCode) {
+    const routes = {
+        retire: "{{ url('/assets') }}/" + assetId + "/transition/retire",
+        maintenance: "{{ url('/assets') }}/" + assetId + "/transition/maintenance",
+        warranty: "{{ url('/assets') }}/" + assetId + "/transition/warranty",
+        transfer: "{{ url('/assets') }}/" + assetId + "/transition/transfer",
+        baja: "{{ url('/assets') }}/" + assetId + "/transition/baja",
+        donation: "{{ url('/assets') }}/" + assetId + "/transition/donation",
+        sale: "{{ url('/assets') }}/" + assetId + "/transition/sale",
+    };
+
+    const ids = {
+        retire: ['formRetire', 'retireCode', 'modalRetire'],
+        maintenance: ['formMaintenance', 'maintenanceCode', 'modalMaintenance'],
+        warranty: ['formWarranty', 'warrantyCode', 'modalWarranty'],
+        transfer: ['formTransfer', 'transferCode', 'modalTransfer'],
+        baja: ['formBaja', 'bajaCode', 'modalBaja'],
+        donation: ['formDonation', 'donationCode', 'modalDonation'],
+        sale: ['formSale', 'saleCode', 'modalSale'],
+    };
+
+    const meta = ids[type];
+    if (!meta) return;
+    document.getElementById(meta[0]).action = routes[type];
+    document.getElementById(meta[1]).textContent = assetCode;
+    $('#' + meta[2]).modal('show');
+}
+</script>
 @stop
 
 @section('content')
@@ -57,6 +261,7 @@
                             <th>Tipo</th>
                             <th>Marca / Modelo</th>
                             <th>Estado</th>
+                            <th class="text-center">Acciones</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -77,6 +282,42 @@
                                     <span class="badge badge-success" style="font-size:.65rem;">
                                         <i class="fas fa-check mr-1"></i>Asignado
                                     </span>
+                                @endif
+                            </td>
+                            <td class="py-2 text-center">
+                                @if(!$aa->returned_at && $assignment->status === 'activa')
+                                    <div class="btn-group">
+                                        <button type="button" class="btn btn-xs btn-outline-secondary dropdown-toggle" data-toggle="dropdown">
+                                            <i class="fas fa-ellipsis-v"></i>
+                                        </button>
+                                        <div class="dropdown-menu dropdown-menu-right">
+                                            <a class="dropdown-item text-success" href="#" onclick="openModal('retire', {{ $aa->asset->id }}, '{{ $aa->asset->internal_code }}')">
+                                                <i class="fas fa-undo-alt mr-1"></i> Retirar (Disponible)
+                                            </a>
+                                            <div class="dropdown-divider"></div>
+                                            <a class="dropdown-item text-warning" href="#" onclick="openModal('maintenance', {{ $aa->asset->id }}, '{{ $aa->asset->internal_code }}')">
+                                                <i class="fas fa-tools mr-1"></i> Enviar a Mantenimiento
+                                            </a>
+                                            <a class="dropdown-item text-info" href="#" onclick="openModal('warranty', {{ $aa->asset->id }}, '{{ $aa->asset->internal_code }}')">
+                                                <i class="fas fa-shield-alt mr-1"></i> Enviar a Garantia
+                                            </a>
+                                            <a class="dropdown-item text-primary" href="#" onclick="openModal('transfer', {{ $aa->asset->id }}, '{{ $aa->asset->internal_code }}')">
+                                                <i class="fas fa-exchange-alt mr-1"></i> Trasladar de Sede
+                                            </a>
+                                            <div class="dropdown-divider"></div>
+                                            <a class="dropdown-item text-danger" href="#" onclick="openModal('baja', {{ $aa->asset->id }}, '{{ $aa->asset->internal_code }}')">
+                                                <i class="fas fa-ban mr-1"></i> Dar de Baja
+                                            </a>
+                                            <a class="dropdown-item text-dark" href="#" onclick="openModal('donation', {{ $aa->asset->id }}, '{{ $aa->asset->internal_code }}')">
+                                                <i class="fas fa-hand-holding-heart mr-1"></i> Donar
+                                            </a>
+                                            <a class="dropdown-item text-dark" href="#" onclick="openModal('sale', {{ $aa->asset->id }}, '{{ $aa->asset->internal_code }}')">
+                                                <i class="fas fa-tag mr-1"></i> Vender
+                                            </a>
+                                        </div>
+                                    </div>
+                                @else
+                                    <small class="text-muted">—</small>
                                 @endif
                             </td>
                         </tr>

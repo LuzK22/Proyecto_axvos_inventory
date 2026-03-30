@@ -207,21 +207,14 @@ class AssetTransitionController extends Controller
                     'assignment_id' => $assignment->id,
                     'acta_number'   => Acta::generateActaNumber($asset->type?->category ?? 'TI', Acta::TYPE_BAJA),
                     'acta_type'     => Acta::TYPE_BAJA,
+                    'asset_category'=> strtoupper($asset->type?->category ?? 'TI'),
                     'status'        => Acta::STATUS_BORRADOR,
                     'generated_by'  => auth()->id(),
                     'notes'         => "Baja de activo {$asset->internal_code}. Motivo: {$request->reason}. {$request->notes}",
                 ]);
 
                 // Solo firma el responsable; el activo ya no está con ningún colaborador
-                ActaSignature::create([
-                    'acta_id'          => $acta->id,
-                    'signer_role'      => 'responsible',
-                    'signer_name'      => auth()->user()->name,
-                    'signer_email'     => auth()->user()->email,
-                    'signer_user_id'   => auth()->id(),
-                    'token'            => ActaSignature::generateToken(),
-                    'token_expires_at' => now()->addDays(30),
-                ]);
+                ActaSignature::createResponsibleSignature($acta, auth()->user(), 30);
 
                 return $acta;
             }
@@ -269,20 +262,13 @@ class AssetTransitionController extends Controller
                     'assignment_id' => $assignment->id,
                     'acta_number'   => Acta::generateActaNumber($asset->type?->category ?? 'TI', Acta::TYPE_DONACION),
                     'acta_type'     => Acta::TYPE_DONACION,
+                    'asset_category'=> strtoupper($asset->type?->category ?? 'TI'),
                     'status'        => Acta::STATUS_BORRADOR,
                     'generated_by'  => auth()->id(),
                     'notes'         => "Donación a: {$request->recipient}. {$request->notes}",
                 ]);
 
-                ActaSignature::create([
-                    'acta_id'          => $acta->id,
-                    'signer_role'      => 'responsible',
-                    'signer_name'      => auth()->user()->name,
-                    'signer_email'     => auth()->user()->email,
-                    'signer_user_id'   => auth()->id(),
-                    'token'            => ActaSignature::generateToken(),
-                    'token_expires_at' => now()->addDays(30),
-                ]);
+                ActaSignature::createResponsibleSignature($acta, auth()->user(), 30);
 
                 return $acta;
             }
@@ -331,20 +317,13 @@ class AssetTransitionController extends Controller
                     'assignment_id' => $assignment->id,
                     'acta_number'   => Acta::generateActaNumber($asset->type?->category ?? 'TI', Acta::TYPE_VENTA),
                     'acta_type'     => Acta::TYPE_VENTA,
+                    'asset_category'=> strtoupper($asset->type?->category ?? 'TI'),
                     'status'        => Acta::STATUS_BORRADOR,
                     'generated_by'  => auth()->id(),
                     'notes'         => "Venta a: {$request->buyer}.{$valueNote} {$request->notes}",
                 ]);
 
-                ActaSignature::create([
-                    'acta_id'          => $acta->id,
-                    'signer_role'      => 'responsible',
-                    'signer_name'      => auth()->user()->name,
-                    'signer_email'     => auth()->user()->email,
-                    'signer_user_id'   => auth()->id(),
-                    'token'            => ActaSignature::generateToken(),
-                    'token_expires_at' => now()->addDays(30),
-                ]);
+                ActaSignature::createResponsibleSignature($acta, auth()->user(), 30);
 
                 return $acta;
             }

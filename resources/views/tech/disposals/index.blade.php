@@ -12,6 +12,7 @@
             @endif
         </h1>
         <small class="text-muted">Historial de solicitudes de desincorporación de activos</small>
+        <small class="text-muted d-block">Este modulo corresponde solo a bajas (no incluye historial de asignaciones).</small>
     </div>
     <div>
         @can($category === 'TI' ? 'tech.assets.disposal.request' : 'assets.disposal.request')

@@ -81,6 +81,30 @@
                 </div>
 
                 <div class="form-group mt-3">
+                    <label>Destino de la Asignacion <span class="text-danger">*</span></label>
+                    <select name="destination_type" id="destination_type" class="form-control mb-2" required>
+                        <option value="collaborator" {{ old('destination_type', 'collaborator') === 'collaborator' ? 'selected' : '' }}>Colaborador</option>
+                        <option value="jefe" {{ old('destination_type') === 'jefe' ? 'selected' : '' }}>Jefe / Responsable</option>
+                        <option value="area" {{ old('destination_type') === 'area' ? 'selected' : '' }}>Area Compartida</option>
+                        <option value="pool" {{ old('destination_type') === 'pool' ? 'selected' : '' }}>Pool Compartido</option>
+                    </select>
+                    <select name="area_id" id="area_id" class="form-control d-none">
+                        <option value="">Seleccione area...</option>
+                        @foreach($areas as $area)
+                            <option value="{{ $area->id }}" {{ (string) old('area_id') === (string) $area->id ? 'selected' : '' }}>
+                                {{ $area->name }}{{ $area->branch ? ' - ' . $area->branch->name : '' }}
+                            </option>
+                        @endforeach
+                    </select>
+                    @error('destination_type')
+                        <small class="text-danger d-block">{{ $message }}</small>
+                    @enderror
+                    @error('area_id')
+                        <small class="text-danger d-block">{{ $message }}</small>
+                    @enderror
+                </div>
+
+                <div class="form-group mt-3">
                     <label>Fecha de Asignacion <span class="text-danger">*</span></label>
                     <input type="date" name="assignment_date" class="form-control"
                            value="{{ old('assignment_date', date('Y-m-d')) }}" required>
@@ -114,6 +138,14 @@
                     <input type="text" id="assetSearch" class="form-control"
                            placeholder="Filtrar por codigo, tipo, marca, serial...">
                 </div>
+                <div class="mb-3">
+                    <select id="assetSubcategoryFilter" class="form-control form-control-sm">
+                        <option value="">Todas las subcategorias</option>
+                        @foreach($availableAssets->pluck('type.subcategory')->filter()->unique()->sort()->values() as $sub)
+                            <option value="{{ strtolower($sub) }}">{{ $sub }}</option>
+                        @endforeach
+                    </select>
+                </div>
 
                 @error('asset_ids')
                     <div class="alert alert-danger py-2">
@@ -141,14 +173,19 @@
                             </thead>
                             <tbody>
                                 @foreach($availableAssets as $asset)
-                                    <tr class="asset-row">
+                                    <tr class="asset-row" data-subcategory="{{ strtolower($asset->type?->subcategory ?? '') }}">
                                         <td>
                                             <input type="checkbox" name="asset_ids[]" value="{{ $asset->id }}"
                                                    class="asset-checkbox"
                                                    {{ in_array($asset->id, (array) old('asset_ids', [])) ? 'checked' : '' }}>
                                         </td>
                                         <td><code>{{ $asset->internal_code }}</code></td>
-                                        <td>{{ $asset->type?->name }}</td>
+                                        <td>
+                                            {{ $asset->type?->name }}
+                                            @if($asset->type?->subcategory)
+                                                <br><small class="text-muted">{{ $asset->type->subcategory }}</small>
+                                            @endif
+                                        </td>
                                         <td>{{ $asset->brand }} {{ $asset->model }}</td>
                                         <td><small>{{ $asset->serial }}</small></td>
                                         <td><small>{{ $asset->branch?->name }}</small></td>
@@ -195,7 +232,17 @@ document.addEventListener('DOMContentLoaded', function () {
     const selectedCount = document.getElementById('selectedCount');
     const selectAll = document.getElementById('selectAll');
     const assetSearch = document.getElementById('assetSearch');
+    const assetSubcategoryFilter = document.getElementById('assetSubcategoryFilter');
     const templateTypeId = {{ $modalityAssignmentType?->id ?? 'null' }};
+    const destinationType = document.getElementById('destination_type');
+    const areaSelect = document.getElementById('area_id');
+
+    function syncDestinationFields() {
+        const requiresArea = ['area', 'pool'].includes(destinationType.value);
+        areaSelect.classList.toggle('d-none', !requiresArea);
+        areaSelect.required = requiresArea;
+        if (!requiresArea) areaSelect.value = '';
+    }
 
     function updateSubmit() {
         const checked = document.querySelectorAll('.asset-checkbox:checked').length;
@@ -275,13 +322,27 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    if (assetSearch) {
-        assetSearch.addEventListener('input', function () {
-            const val = this.value.toLowerCase();
-            document.querySelectorAll('.asset-row').forEach(row => {
-                row.style.display = row.textContent.toLowerCase().includes(val) ? '' : 'none';
-            });
+    function applyAssetFilters() {
+        const text = (assetSearch?.value || '').toLowerCase();
+        const sub = (assetSubcategoryFilter?.value || '').toLowerCase();
+        document.querySelectorAll('.asset-row').forEach(row => {
+            const matchesText = row.textContent.toLowerCase().includes(text);
+            const rowSub = (row.dataset.subcategory || '').toLowerCase();
+            const matchesSub = !sub || rowSub === sub;
+            row.style.display = (matchesText && matchesSub) ? '' : 'none';
         });
+    }
+
+    if (assetSearch) {
+        assetSearch.addEventListener('input', applyAssetFilters);
+    }
+    if (assetSubcategoryFilter) {
+        assetSubcategoryFilter.addEventListener('change', applyAssetFilters);
+    }
+
+    if (destinationType) {
+        destinationType.addEventListener('change', syncDestinationFields);
+        syncDestinationFields();
     }
 
     updateSubmit();

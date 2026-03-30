@@ -325,11 +325,19 @@
                                     </td>
                                     <td><code style="font-size:.74rem;">{{ $aa->asset->internal_code }}</code></td>
                                     <td>
-                                        <a href="{{ route('collaborators.show', $aa->assignment->collaborator) }}" class="text-dark font-weight-bold">
-                                            {{ $aa->assignment->collaborator->full_name }}
-                                        </a>
+                                        @if($aa->assignment?->collaborator)
+                                            <a href="{{ route('collaborators.show', $aa->assignment->collaborator) }}" class="text-dark font-weight-bold">
+                                                {{ $aa->assignment->collaborator->full_name }}
+                                            </a>
+                                        @else
+                                            <span class="text-dark font-weight-bold">
+                                                {{ $aa->assignment?->area?->name ? 'Área: ' . $aa->assignment->area->name : 'Sin colaborador' }}
+                                            </span>
+                                        @endif
                                     </td>
-                                    <td class="text-muted d-none d-md-table-cell">{{ $aa->assignment->collaborator->branch?->name ?? '-' }}</td>
+                                    <td class="text-muted d-none d-md-table-cell">
+                                        {{ $aa->assignment?->collaborator?->branch?->name ?? $aa->assignment?->area?->branch?->name ?? '-' }}
+                                    </td>
                                     <td class="text-muted text-right pr-3">
                                         {{ ($aa->isReturned() ? $aa->returned_at : $aa->assigned_at)?->diffForHumans() }}
                                     </td>
@@ -558,7 +566,12 @@
 @stop
 
 @section('js')
+<script src="https://cdn.jsdelivr.net/npm/chart.js@2.9.4/dist/Chart.min.js"></script>
 <script>
+if (typeof Chart === 'undefined') {
+    console.warn('Chart.js no cargó; se omiten gráficos de dashboard.');
+}
+
 const STATUS_COLORS = {
     'Disponible':    '#16a34a',
     'Asignado':      '#1d4ed8',
@@ -597,6 +610,7 @@ function buildLegend(id, labels, colors) {
 
 @if($tiAssets > 0)
 (function () {
+    if (typeof Chart === 'undefined') return;
     const data = @json($tiByStatus);
     const labels = Object.keys(data), values = Object.values(data);
     const colors = labels.map(l => STATUS_COLORS[l] || '#6b7280');
@@ -611,6 +625,7 @@ function buildLegend(id, labels, colors) {
 
 @if($otroAssets > 0)
 (function () {
+    if (typeof Chart === 'undefined') return;
     const data = @json($otroByStatus);
     const labels = Object.keys(data), values = Object.values(data);
     const colors = labels.map(l => STATUS_COLORS[l] || '#6b7280');
@@ -625,6 +640,7 @@ function buildLegend(id, labels, colors) {
 
 @if($activeAssignments > 0)
 (function () {
+    if (typeof Chart === 'undefined') return;
     const raw = @json($assignmentsByModality);
     const labels = Object.keys(raw).map(k => MODALITY_LABELS[k] || k);
     const values = Object.values(raw);

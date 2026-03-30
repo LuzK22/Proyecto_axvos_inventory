@@ -24,8 +24,9 @@ class ReportController extends Controller
         $types    = AssetType::where('category', $category)->orderBy('name')->get();
         $branches = Branch::where('active', true)->orderBy('name')->get();
         $statuses = Status::orderBy('name')->get();
+        $subcategories = AssetType::where('category', $category)->whereNotNull('subcategory')->distinct()->pluck('subcategory')->sort()->values();
 
-        return view('tech.reports.hub', compact('assets', 'stats', 'types', 'branches', 'statuses'));
+        return view('tech.reports.hub', compact('assets', 'stats', 'types', 'branches', 'statuses', 'subcategories'));
     }
 
     public function techExport(Request $request)
@@ -218,6 +219,9 @@ class ReportController extends Controller
         if ($request->filled('status_id'))   $q->where('status_id',    $request->status_id);
         if ($request->filled('branch_id'))   $q->where('branch_id',    $request->branch_id);
         if ($request->filled('type_id'))     $q->where('asset_type_id',$request->type_id);
+        if ($request->filled('subcategory')) {
+            $q->whereHas('type', fn($sq) => $sq->where('subcategory', $request->subcategory));
+        }
         if ($request->filled('property_type')) $q->where('property_type', $request->property_type);
 
         return $q;

@@ -55,6 +55,14 @@
                     <option value="{{ $t->id }}" {{ request('type_id') == $t->id ? 'selected' : '' }}>{{ $t->name }}</option>
                 @endforeach
             </select>
+            @if(($subcategories ?? collect())->count())
+                <select name="subcategory" class="form-control form-control-sm">
+                    <option value="">Todas las subcategorias</option>
+                    @foreach($subcategories as $sub)
+                        <option value="{{ $sub }}" {{ request('subcategory') === $sub ? 'selected' : '' }}>{{ $sub }}</option>
+                    @endforeach
+                </select>
+            @endif
             <select name="status_id" class="form-control form-control-sm">
                 <option value="">Todos los estados</option>
                 @foreach($statuses as $s)
@@ -76,7 +84,7 @@
             <button type="submit" class="btn btn-sm btn-primary">
                 <i class="fas fa-filter mr-1"></i> Filtrar
             </button>
-            @if(request()->hasAny(['q','type_id','status_id','branch_id','property_type']))
+            @if(request()->hasAny(['q','type_id','subcategory','status_id','branch_id','property_type']))
                 <a href="{{ route('tech.reports.index') }}" class="btn btn-sm btn-outline-secondary">
                     <i class="fas fa-times mr-1"></i> Limpiar filtros
                 </a>
@@ -111,6 +119,7 @@
                     <tr>
                         <th class="pl-3">Código</th>
                         <th>Tipo</th>
+                        <th>Subcategoría</th>
                         <th>Marca / Modelo</th>
                         <th>Serial</th>
                         <th>Estado</th>
@@ -125,6 +134,13 @@
                     <tr>
                         <td class="pl-3"><code style="font-size:.78rem;">{{ $asset->internal_code }}</code></td>
                         <td><small>{{ $asset->type?->name ?? '—' }}</small></td>
+                        <td>
+                            @if($asset->type?->subcategory)
+                                <span class="badge badge-light border text-muted" style="font-size:.65rem;">{{ $asset->type->subcategory }}</span>
+                            @else
+                                <span class="text-muted">—</span>
+                            @endif
+                        </td>
                         <td><small>{{ $asset->brand }} {{ $asset->model }}</small></td>
                         <td><small class="text-muted">{{ $asset->serial ?? '—' }}</small></td>
                         <td>
@@ -151,7 +167,7 @@
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="9" class="text-center text-muted py-4">
+                        <td colspan="10" class="text-center text-muted py-4">
                             <i class="fas fa-inbox fa-2x d-block mb-2" style="opacity:.2;"></i>
                             No se encontraron activos TI con los filtros aplicados.
                         </td>

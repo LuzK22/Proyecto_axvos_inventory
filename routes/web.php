@@ -116,6 +116,8 @@ Route::middleware(['auth', 'require.consent', 'require.2fa'])->group(function ()
 
     Route::patch('/profile', [ProfileController::class, 'update'])
         ->name('profile.update');
+    Route::post('/profile/signature', [ProfileController::class, 'updateSignature'])
+        ->name('profile.signature.update');
 
     Route::delete('/profile', [ProfileController::class, 'destroy'])
         ->name('profile.destroy');
@@ -253,6 +255,10 @@ Route::middleware(['auth', 'require.consent', 'require.2fa'])->group(function ()
             Route::post('/assets', [AssetController::class, 'store'])
                 ->name('assets.store')
                 ->middleware('can:tech.assets.create');
+
+            Route::get('/assets/history', [AssetController::class, 'techAssetsHistory'])
+                ->name('assets.history.index')
+                ->middleware('can:tech.history.view');
 
             Route::get('/assets/{asset}', [AssetController::class, 'show'])
                 ->name('assets.show')
@@ -476,7 +482,7 @@ Route::middleware(['auth', 'require.consent', 'require.2fa'])->group(function ()
         ->name('asset.transition.')
         ->group(function () {
             // Movimientos operativos — requieren permiso de asignación
-            Route::middleware('can:tech.assets.assign')->group(function () {
+            Route::middleware('permission:tech.assets.assign|assets.assign')->group(function () {
                 Route::post('/retire',      [AssetTransitionController::class, 'retire'])         ->name('retire');
                 Route::post('/maintenance', [AssetTransitionController::class, 'toMaintenance'])  ->name('maintenance');
                 Route::post('/warranty',    [AssetTransitionController::class, 'toWarranty'])     ->name('warranty');
@@ -484,7 +490,7 @@ Route::middleware(['auth', 'require.consent', 'require.2fa'])->group(function ()
                 Route::post('/arrival',     [AssetTransitionController::class, 'arrivalConfirm']) ->name('arrival');
             });
             // Desincorporaciones — requieren permiso de solicitud de baja
-            Route::middleware('can:tech.assets.disposal.request')->group(function () {
+            Route::middleware('permission:tech.assets.disposal.request|assets.disposal.request')->group(function () {
                 Route::post('/baja',     [AssetTransitionController::class, 'toBaja'])     ->name('baja');
                 Route::post('/donation', [AssetTransitionController::class, 'toDonation']) ->name('donation');
                 Route::post('/sale',     [AssetTransitionController::class, 'toSale'])     ->name('sale');

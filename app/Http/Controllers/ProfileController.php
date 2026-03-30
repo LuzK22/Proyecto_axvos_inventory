@@ -57,4 +57,22 @@ class ProfileController extends Controller
 
         return Redirect::to('/');
     }
+
+    /**
+     * Guarda la firma base del usuario para autocompletar actas.
+     */
+    public function updateSignature(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'signature_type' => ['required', 'in:drawn,image'],
+            'signature_data' => ['required', 'string'],
+        ]);
+
+        $request->user()->update([
+            'default_signature_type' => $data['signature_type'],
+            'default_signature_data' => $data['signature_data'],
+        ]);
+
+        return Redirect::route('profile.edit')->with('status', 'signature-updated');
+    }
 }

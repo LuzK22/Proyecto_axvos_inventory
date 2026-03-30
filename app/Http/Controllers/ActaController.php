@@ -76,6 +76,7 @@ class ActaController extends Controller
     {
         $acta->load([
             'assignment.collaborator',
+            'assignment.area',
             'assignment.assignmentAssets.asset.type',
             'generatedBy',
             'signatures.signerUser',
@@ -154,7 +155,7 @@ class ActaController extends Controller
 
         $base = [
             'acta_number'          => $acta->acta_number,
-            'acta_type'            => $acta->acta_type,
+            'acta_type'            => $acta->type_label,
             'asset_category'       => $category,
             'collaborator_name'    => $acta->assignment->collaborator?->full_name,
             'collaborator_document'=> $acta->assignment->collaborator?->document,
@@ -280,9 +281,9 @@ class ActaController extends Controller
 
         $this->resetGeneratedDocuments($acta);
 
-        return redirect()
-            ->route('actas.show', $acta)
-            ->with('success', 'Campos del acta guardados correctamente. Ahora puedes generar el Excel final desde la web.');
+        // Al guardar campos web, regeneramos de inmediato el Excel borrador
+        // para que el usuario pueda continuar directo con PDF final.
+        return $this->generateExcelDraft($request, $acta);
     }
 
     private function resolveIterableValue(string $key, $assignmentAsset): string

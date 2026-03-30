@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Acta;
+use App\Models\ActaSignature;
 use App\Models\Area;
 use App\Models\Asset;
 use App\Models\AssetEvent;
@@ -49,10 +50,65 @@ class OtroAssetAssignmentController extends Controller
             });
         }
 
-        $assignments = $q->orderByDesc('assignment_date')->paginate(25)->withQueryString();
+        $view = $request->get('view', 'grouped');
+        if (!in_array($view, ['grouped', 'detail'], true)) {
+            $view = 'grouped';
+        }
+
+        $groupBy = $request->get('group_by', 'area');
+        if (!in_array($groupBy, ['area', 'collaborator', 'jefe'], true)) {
+            $groupBy = 'area';
+        }
+
+        $allAssignments = (clone $q)->orderByDesc('assignment_date')->get();
+        $assignments = (clone $q)->orderByDesc('assignment_date')->paginate(25)->withQueryString();
+
+        $groupsCollection = match ($groupBy) {
+            'collaborator' => $allAssignments
+                ->where('destination_type', 'collaborator')
+                ->whereNotNull('collaborator_id')
+                ->groupBy('collaborator_id'),
+            'jefe' => $allAssignments
+                ->where('destination_type', 'jefe')
+                ->whereNotNull('collaborator_id')
+                ->groupBy('collaborator_id'),
+            default => $allAssignments
+                ->whereIn('destination_type', ['area', 'pool'])
+                ->whereNotNull('area_id')
+                ->groupBy('area_id'),
+        };
+
+        $groupedRows = $groupsCollection->map(function ($items, $key) use ($groupBy) {
+            $first = $items->first();
+            $assetsCount = $items->sum(fn($a) => $a->assignmentAssets->whereNull('returned_at')->count());
+            $latest = $items->sortByDesc('assignment_date')->first();
+
+            return [
+                'key' => $key,
+                'name' => $groupBy === 'area'
+                    ? ($first->area?->name ?? 'Area sin nombre')
+                    : ($first->collaborator?->full_name ?? 'Colaborador sin nombre'),
+                'branch' => $groupBy === 'area'
+                    ? ($first->area?->branch?->name ?? '-')
+                    : ($first->collaborator?->branch?->name ?? '-'),
+                'destination_label' => $groupBy === 'area'
+                    ? 'Area / Pool'
+                    : ($groupBy === 'jefe' ? 'Jefe responsable' : 'Colaborador'),
+                'assignments_count' => $items->count(),
+                'assets_count' => $assetsCount,
+                'latest_assignment' => $latest,
+                'sample_codes' => $items
+                    ->flatMap(fn($a) => $a->assignmentAssets->whereNull('returned_at')->pluck('asset.internal_code'))
+                    ->filter()
+                    ->unique()
+                    ->take(6)
+                    ->values(),
+            ];
+        })->sortByDesc(fn($row) => $row['latest_assignment']->assignment_date)->values();
+
         $branches = Branch::where('active', true)->orderBy('name')->get();
 
-        return view('assets.assignments.index', compact('assignments', 'branches'));
+        return view('assets.assignments.index', compact('assignments', 'branches', 'view', 'groupBy', 'groupedRows'));
     }
 
     public function create()
@@ -88,7 +144,7 @@ class OtroAssetAssignmentController extends Controller
         $request->validate([
             'destination_type' => 'required|in:collaborator,jefe,area,pool',
             'collaborator_id' => 'required_if:destination_type,collaborator|required_if:destination_type,jefe|nullable|exists:collaborators,id',
-            'area_id' => 'required_if:destination_type,area|nullable|exists:areas,id',
+            'area_id' => 'required_if:destination_type,area,pool|nullable|exists:areas,id',
             'assignment_date' => 'required|date',
             'assets' => 'required|array|min:1',
             'assets.*' => 'exists:assets,id',
@@ -192,6 +248,8 @@ class OtroAssetAssignmentController extends Controller
 
         $availableStatus = Status::where('name', 'Disponible')->first();
 
+        $returnedAssignmentAssetIds = [];
+
         foreach ($request->assets as $aaId) {
             $aa = AssignmentAsset::with('asset.status')
                 ->where('id', $aaId)
@@ -208,6 +266,7 @@ class OtroAssetAssignmentController extends Controller
                 'return_notes' => $request->notes,
                 'returned_by' => auth()->id(),
             ]);
+            $returnedAssignmentAssetIds[] = $aa->id;
 
             if ($availableStatus && $aa->asset) {
                 $aa->asset->update(['status_id' => $availableStatus->id]);
@@ -224,6 +283,30 @@ class OtroAssetAssignmentController extends Controller
         }
 
         $assignment->refreshStatus();
+
+        if (!empty($returnedAssignmentAssetIds)) {
+            $acta = Acta::create([
+                'assignment_id' => $assignment->id,
+                'acta_number' => Acta::generateActaNumber('OTRO', Acta::TYPE_DEVOLUCION),
+                'acta_type' => Acta::TYPE_DEVOLUCION,
+                'asset_category' => 'OTRO',
+                'asset_scope' => ['assignment_asset_ids' => array_values($returnedAssignmentAssetIds)],
+                'status' => Acta::STATUS_BORRADOR,
+                'generated_by' => auth()->id(),
+                'notes' => $request->notes,
+            ]);
+
+            $recipientName = $assignment->collaborator?->full_name
+                ?? ($assignment->area ? ('Area: ' . $assignment->area->name) : '—');
+            $recipientEmail = $assignment->collaborator?->email;
+
+            ActaSignature::createCollaboratorSignature($acta, $recipientName, $recipientEmail, 7);
+            ActaSignature::createResponsibleSignature($acta, auth()->user(), 7);
+
+            return redirect()
+                ->route('actas.show', $acta)
+                ->with('success', 'Devolucion registrada. Se genero el Acta de Devolucion para los activos seleccionados.');
+        }
 
         return redirect()
             ->route('assets.assignments.show', $assignment)

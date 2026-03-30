@@ -147,7 +147,7 @@
             <div class="tbl-wrap table-responsive" data-col-table="ti">
                 <table class="table table-sm table-hover mb-0">
                     <thead class="tbl-head"><tr>
-                        <th class="pl-3 col-code">Codigo</th><th class="col-tag">Tag</th><th class="col-fixed">Codigo Fijo</th><th class="col-branch">Sede</th><th class="col-type">Tipo</th><th class="col-brand">Marca</th><th class="col-model">Modelo</th><th class="col-serial">Serial</th><th class="col-status">Estado</th><th class="col-detail text-center">Detalle</th>
+                        <th class="pl-3 col-code">Codigo</th><th class="col-tag">Tag</th><th class="col-fixed">Codigo Fijo</th><th class="col-branch">Sede</th><th class="col-type">Tipo</th><th class="col-brand">Marca</th><th class="col-model">Modelo</th><th class="col-serial">Serial</th><th class="col-status">Estado</th><th class="col-detail text-center">Detalle</th><th class="text-center">Gestion</th>
                     </tr></thead>
                     <tbody>
                     @forelse($tiItems as $it)
@@ -163,9 +163,26 @@
                             <td class="col-serial">{{ $a->serial ?? '-' }}</td>
                             <td class="col-status"><span class="badge badge-light border">{{ $a->status?->name ?? '-' }}</span></td>
                             <td class="col-detail text-center"><a href="{{ url('/tech/assets/'.$a->id) }}" class="btn btn-xs btn-outline-primary detail-btn"><i class="fas fa-eye"></i></a></td>
+                            <td class="text-center">
+                                @can('tech.assets.assign')
+                                    @if($it->assignment_id)
+                                        <a href="{{ route('tech.assignments.return', ['assignment' => $it->assignment_id, 'asset_ids' => $a->id]) }}" class="btn btn-xs btn-warning" title="Devolver este activo">
+                                            <i class="fas fa-undo"></i>
+                                        </a>
+                                        <a href="{{ route('tech.assignments.show', $it->assignment_id) }}" class="btn btn-xs btn-outline-info" title="Ver asignacion">
+                                            <i class="fas fa-clipboard-list"></i>
+                                        </a>
+                                    @endif
+                                    <a href="{{ route('tech.assignments.create', ['collaborator_id' => $collaborator->id]) }}" class="btn btn-xs btn-outline-primary" title="Asignar reemplazo">
+                                        <i class="fas fa-plus"></i>
+                                    </a>
+                                @else
+                                    <span class="text-muted">-</span>
+                                @endcan
+                            </td>
                         </tr>
                     @empty
-                        <tr><td colspan="10" class="text-center text-muted py-4">Sin activos TI asignados.</td></tr>
+                        <tr><td colspan="11" class="text-center text-muted py-4">Sin activos TI asignados.</td></tr>
                     @endforelse
                     </tbody>
                 </table>

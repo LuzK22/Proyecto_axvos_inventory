@@ -1,12 +1,13 @@
 @extends('adminlte::page')
-@section('title', 'Historial - Otros Activos')
+
+@section('title', 'Historial de Activos TI')
 
 @section('content_header')
 <div class="d-flex justify-content-between align-items-center">
     <h1 class="m-0">
-        <i class="fas fa-history text-secondary mr-2"></i>Historial - Otros Activos
+        <i class="fas fa-history text-primary mr-2"></i>Historial de Activos TI
     </h1>
-    <a href="{{ route('assets.hub') }}" class="btn btn-secondary btn-sm">
+    <a href="{{ route('tech.assets.hub') }}" class="btn btn-secondary btn-sm">
         <i class="fas fa-arrow-left mr-1"></i>Volver al hub
     </a>
 </div>
@@ -16,19 +17,10 @@
 @include('partials._alerts')
 
 <div class="card card-outline card-primary mb-3">
-    <div class="card-body py-2 d-flex flex-wrap" style="gap:.45rem;">
-        <span class="badge badge-primary px-3 py-2">Activos OTRO: {{ $totalAssetsCount }}</span>
-        <span class="badge badge-info px-3 py-2">Asignaciones activas: {{ $activeAssignmentsCount }}</span>
-        <span class="badge badge-warning px-3 py-2">Prestamos activos/vencidos: {{ $activeLoansCount }}</span>
-        <span class="badge badge-success px-3 py-2">Disponibles: {{ $availableAssetsCount }}</span>
-    </div>
-</div>
-
-<div class="card card-outline card-primary mb-3">
     <div class="card-body py-2">
         <form method="GET" class="form-inline" style="gap:8px;">
             <input type="text" name="q" value="{{ request('q') }}" class="form-control form-control-sm"
-                   placeholder="Buscar por codigo, marca, modelo, colaborador o area..." style="min-width:320px;">
+                   placeholder="Buscar por codigo, marca, modelo, serial o detalle..." style="min-width:320px;">
             <select name="event_type" class="form-control form-control-sm">
                 <option value="">Todos los eventos</option>
                 @foreach($eventTypes as $key => $label)
@@ -49,7 +41,7 @@
                 <i class="fas fa-filter mr-1"></i>Filtrar
             </button>
             @if(request()->hasAny(['q', 'event_type', 'subcategory']))
-                <a href="{{ route('assets.history.index') }}" class="btn btn-sm btn-outline-secondary">
+                <a href="{{ route('tech.assets.history.index') }}" class="btn btn-sm btn-outline-secondary">
                     <i class="fas fa-times mr-1"></i>Limpiar
                 </a>
             @endif
@@ -58,10 +50,10 @@
 </div>
 
 <div id="historyAccordion">
-    <div class="card card-outline card-secondary mb-2">
+    <div class="card card-outline card-primary mb-2">
         <div class="card-header py-2">
             <button class="btn btn-link p-0 text-dark font-weight-bold" data-toggle="collapse" data-target="#eventsSection" aria-expanded="true">
-                <i class="fas fa-stream mr-1"></i> Eventos de historial ({{ $events->total() }})
+                <i class="fas fa-stream mr-1"></i> Eventos de activos TI ({{ $events->total() }})
             </button>
         </div>
         <div id="eventsSection" class="collapse show" data-parent="#historyAccordion">
@@ -85,7 +77,13 @@
                                 <tr>
                                     <td><small>{{ $event->created_at?->format('d/m/Y H:i') }}</small></td>
                                     <td>
-                                        <code>{{ $event->asset?->internal_code ?? '-' }}</code>
+                                        @if($event->asset)
+                                            <a href="{{ route('tech.assets.show', $event->asset) }}">
+                                                <code>{{ $event->asset->internal_code }}</code>
+                                            </a>
+                                        @else
+                                            <code>-</code>
+                                        @endif
                                         <small class="d-block text-muted">{{ $event->asset?->type?->name ?? '-' }}</small>
                                     </td>
                                     <td>
@@ -108,59 +106,16 @@
         </div>
     </div>
 
-    <div class="card card-outline card-info mb-2">
-        <div class="card-header py-2">
-            <button class="btn btn-link p-0 text-dark font-weight-bold" data-toggle="collapse" data-target="#assignmentsSection" aria-expanded="false">
-                <i class="fas fa-user-tag mr-1"></i> Historial de asignaciones ({{ $assignmentsHistory->total() }})
-            </button>
-        </div>
-        <div id="assignmentsSection" class="collapse" data-parent="#historyAccordion">
-            <div class="card-body p-0">
-                @if($assignmentsHistory->isEmpty())
-                    <div class="text-center py-4 text-muted">No hay asignaciones registradas para el filtro actual.</div>
-                @else
-                    <div class="table-responsive">
-                        <table class="table table-sm table-hover mb-0">
-                            <thead class="thead-light" style="font-size:.75rem;text-transform:uppercase;">
-                            <tr>
-                                <th>ID</th>
-                                <th>Destinatario</th>
-                                <th>Activos</th>
-                                <th>Fecha</th>
-                                <th>Estado</th>
-                            </tr>
-                            </thead>
-                            <tbody>
-                            @foreach($assignmentsHistory as $a)
-                                <tr>
-                                    <td>#{{ $a->id }}</td>
-                                    <td>{{ $a->recipient_name }}</td>
-                                    <td>{{ $a->assignmentAssets->count() }}</td>
-                                    <td><small>{{ $a->assignment_date?->format('d/m/Y') }}</small></td>
-                                    <td>{{ ucfirst($a->status) }}</td>
-                                </tr>
-                            @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                @endif
-            </div>
-            @if($assignmentsHistory->hasPages())
-                <div class="card-footer py-2">{{ $assignmentsHistory->links() }}</div>
-            @endif
-        </div>
-    </div>
-
-    <div class="card card-outline card-success">
+    <div class="card card-outline card-info">
         <div class="card-header py-2">
             <button class="btn btn-link p-0 text-dark font-weight-bold" data-toggle="collapse" data-target="#assetsSection" aria-expanded="false">
-                <i class="fas fa-boxes mr-1"></i> Activos registrados ({{ $assets->total() }})
+                <i class="fas fa-laptop mr-1"></i> Activos TI registrados ({{ $assets->total() }})
             </button>
         </div>
         <div id="assetsSection" class="collapse" data-parent="#historyAccordion">
             <div class="card-body p-0">
                 @if($assets->isEmpty())
-                    <div class="text-center py-4 text-muted">Sin activos registrados para el filtro actual.</div>
+                    <div class="text-center py-4 text-muted">Sin activos TI registrados para el filtro actual.</div>
                 @else
                     <div class="table-responsive">
                         <table class="table table-sm table-hover mb-0">
@@ -169,18 +124,24 @@
                                 <th>Codigo</th>
                                 <th>Tipo</th>
                                 <th>Marca / Modelo</th>
+                                <th>Serial</th>
                                 <th>Estado</th>
-                                <th>Fecha registro</th>
+                                <th>Sede</th>
                             </tr>
                             </thead>
                             <tbody>
                             @foreach($assets as $asset)
                                 <tr>
-                                    <td><code>{{ $asset->internal_code }}</code></td>
+                                    <td>
+                                        <a href="{{ route('tech.assets.show', $asset) }}">
+                                            <code>{{ $asset->internal_code }}</code>
+                                        </a>
+                                    </td>
                                     <td>{{ $asset->type?->name ?? '-' }}</td>
                                     <td>{{ trim(($asset->brand ?? '') . ' ' . ($asset->model ?? '')) ?: '-' }}</td>
+                                    <td>{{ $asset->serial ?: '-' }}</td>
                                     <td>{{ $asset->status?->name ?? '-' }}</td>
-                                    <td><small>{{ $asset->created_at?->format('d/m/Y H:i') }}</small></td>
+                                    <td>{{ $asset->branch?->name ?? '-' }}</td>
                                 </tr>
                             @endforeach
                             </tbody>
