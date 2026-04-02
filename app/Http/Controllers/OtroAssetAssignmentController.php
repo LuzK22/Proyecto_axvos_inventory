@@ -204,11 +204,31 @@ class OtroAssetAssignmentController extends Controller
             ]);
         }
 
-        Acta::generateDeliveryForAssignment($assignment, 'OTRO', auth()->user());
+        // Redirigir al expediente del destinatario con modal post-asignación
+        if (in_array($request->destination_type, ['collaborator', 'jefe'], true) && $collaboratorId) {
+            $collaborator = \App\Models\Collaborator::find($collaboratorId);
+            return redirect()
+                ->route('assets.expediente.collaborator', [
+                    'collaborator'     => $collaboratorId,
+                    'nuevo_assignment' => $assignment->id,
+                    'mostrar_modal'    => 1,
+                ])
+                ->with('success', 'Asignación creada correctamente.');
+        }
+
+        if (in_array($request->destination_type, ['area', 'pool'], true) && $areaId) {
+            return redirect()
+                ->route('assets.expediente.area', [
+                    'area'             => $areaId,
+                    'nuevo_assignment' => $assignment->id,
+                    'mostrar_modal'    => 1,
+                ])
+                ->with('success', 'Asignación creada correctamente.');
+        }
 
         return redirect()
             ->route('assets.assignments.show', $assignment)
-            ->with('success', 'Asignacion creada correctamente.');
+            ->with('success', 'Asignación creada correctamente.');
     }
 
     public function show(Assignment $assignment)
@@ -311,6 +331,103 @@ class OtroAssetAssignmentController extends Controller
         return redirect()
             ->route('assets.assignments.show', $assignment)
             ->with('success', 'Devolucion registrada correctamente.');
+    }
+
+    // =========================================================================
+    // BUSCAR DESTINATARIO — página de búsqueda con 3 secciones
+    // =========================================================================
+
+    public function searchPage(Request $request)
+    {
+        $q   = trim($request->get('q', ''));
+        $tab = $request->get('tab', 'all'); // all | collaborator | manager | area
+        if (!in_array($tab, ['all', 'collaborator', 'manager', 'area'], true)) {
+            $tab = 'all';
+        }
+
+        // ── 1. Recoger todos los AssignmentAsset activos de OTRO ──────────────
+        $activeAa = AssignmentAsset::with('assignment')
+            ->whereNull('returned_at')
+            ->whereHas('assignment', fn($sq) =>
+                $sq->where('asset_category', 'OTRO')->where('status', 'activa')
+            )
+            ->get();
+
+        // Agrupar por colaborador (tipo collaborator + jefe)
+        $aaByCollaborator = $activeAa
+            ->filter(fn($aa) => in_array($aa->assignment?->destination_type, ['collaborator', 'jefe']))
+            ->groupBy(fn($aa) => $aa->assignment->collaborator_id);
+
+        // Agrupar por área (tipo area + pool)
+        $aaByArea = $activeAa
+            ->filter(fn($aa) => in_array($aa->assignment?->destination_type, ['area', 'pool']))
+            ->groupBy(fn($aa) => $aa->assignment->area_id);
+
+        // ── 2. Cargar entidades ───────────────────────────────────────────────
+        $collaboratorIds = $aaByCollaborator->keys()->filter()->all();
+        $areaIds         = $aaByArea->keys()->filter()->all();
+
+        $collaboratorQuery = Collaborator::whereIn('id', $collaboratorIds)->where('active', true)->with('branch');
+        $areaQuery         = Area::whereIn('id', $areaIds)->with('branch');
+
+        if ($q !== '') {
+            $lower = $q;
+            $collaboratorQuery->where(fn($sq) =>
+                $sq->where('full_name', 'like', "%{$lower}%")
+                   ->orWhere('document', 'like', "%{$lower}%")
+            );
+            $areaQuery->where('name', 'like', "%{$lower}%");
+        }
+
+        $collaborators = $collaboratorQuery->orderBy('full_name')->get();
+        $areas         = $areaQuery->orderBy('name')->get();
+
+        // ── 3. Última asignación por clave ────────────────────────────────────
+        $latestByCollaborator = Assignment::whereIn('collaborator_id', $collaboratorIds)
+            ->where('asset_category', 'OTRO')->where('status', 'activa')
+            ->orderByDesc('assignment_date')
+            ->get()
+            ->groupBy('collaborator_id')
+            ->map(fn($g) => $g->first());
+
+        $latestByArea = Assignment::whereIn('area_id', $areaIds)
+            ->where('asset_category', 'OTRO')->where('status', 'activa')
+            ->orderByDesc('assignment_date')
+            ->get()
+            ->groupBy('area_id')
+            ->map(fn($g) => $g->first());
+
+        // ── 4. Construir filas ─────────────────────────────────────────────────
+        $collaboratorRows = $collaborators->map(fn($c) => [
+            'id'               => $c->id,
+            'name'             => $c->full_name,
+            'sub'              => 'CC ' . $c->document,
+            'branch'           => $c->branch?->name ?? '—',
+            'modality'         => $c->modalidad_trabajo ?? 'presencial',
+            'destination_type' => $aaByCollaborator->get($c->id, collect())
+                                    ->first()?->assignment->destination_type ?? 'collaborator',
+            'assets_count'     => $aaByCollaborator->get($c->id, collect())->count(),
+            'latest'           => $latestByCollaborator->get($c->id),
+            'route'            => route('assets.expediente.collaborator', $c->id),
+            'create_route'     => route('assets.assignments.create', ['collaborator_id' => $c->id]),
+        ])->values();
+
+        $areaRows = $areas->map(fn($a) => [
+            'id'               => $a->id,
+            'name'             => $a->name,
+            'sub'              => $a->branch?->name ?? '—',
+            'branch'           => $a->branch?->name ?? '—',
+            'modality'         => null,
+            'destination_type' => 'area',
+            'assets_count'     => $aaByArea->get($a->id, collect())->count(),
+            'latest'           => $latestByArea->get($a->id),
+            'route'            => route('assets.expediente.area', $a->id),
+            'create_route'     => route('assets.assignments.create', ['area_id' => $a->id, 'destination' => 'area']),
+        ])->values();
+
+        return view('assets.assignments.search', compact(
+            'collaboratorRows', 'areaRows', 'q', 'tab'
+        ));
     }
 
     private function isOtroAssignment(Assignment $assignment): bool

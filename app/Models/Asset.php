@@ -24,7 +24,7 @@ class Asset extends Model
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
-            ->logOnly(['internal_code', 'asset_tag', 'brand', 'model', 'serial',
+            ->logOnly(['internal_code', 'asset_tag', 'brand', 'model', 'serial', 'hostname', 'domain_user',
                        'fixed_asset_code', 'status_id', 'branch_id', 'property_type'])
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs()
@@ -37,6 +37,8 @@ class Asset extends Model
         'brand',
         'model',
         'serial',
+        'hostname',           // nombre del equipo (ej: LAPTOP-JUAN01, PC-RECEPCION)
+        'domain_user',        // usuario de dominio (ej: jgarcia)
         'fixed_asset_code',   // código contable para cruce con SAP/Siigo
         'property_type',      // PROPIO | LEASING | ALQUILADO | OTRO
         'purchase_value',

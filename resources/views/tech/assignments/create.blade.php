@@ -305,11 +305,25 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     collaboratorSearch.addEventListener('input', function () {
-        const val = this.value.toLowerCase();
-        Array.from(collaboratorSelect.options).forEach((opt, idx) => {
+        const val = this.value.toLowerCase().trim();
+        const opts = Array.from(collaboratorSelect.options);
+        opts.forEach((opt, idx) => {
             if (idx === 0) return;
-            opt.hidden = !opt.text.toLowerCase().includes(val);
+            const match = opt.text.toLowerCase().includes(val);
+            opt.style.display = match ? '' : 'none';
+            // También usamos hidden para compatibilidad
+            opt.hidden = !match;
         });
+        // Si hay solo un resultado visible, auto-seleccionarlo
+        const visible = opts.filter((o, i) => i > 0 && !o.hidden);
+        if (visible.length === 1 && val.length >= 3) {
+            collaboratorSelect.value = visible[0].value;
+            collaboratorSelect.dispatchEvent(new Event('change'));
+        } else if (val === '') {
+            collaboratorSelect.value = '';
+            collaboratorInfo.classList.add('d-none');
+            updateSubmit();
+        }
     });
 
     checkboxes.forEach(cb => cb.addEventListener('change', updateSubmit));

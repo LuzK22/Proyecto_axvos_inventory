@@ -23,8 +23,9 @@
                 <form method="POST" action="{{ route('branches.store') }}">
                     @csrf
                     <div class="form-group">
-                        <label class="font-weight-bold">Nombre</label>
+                        <label class="font-weight-bold">Sucursal (sede)</label>
                         <input type="text" name="name" class="form-control @error('name') is-invalid @enderror" value="{{ old('name') }}" required>
+                        <small class="text-muted">Ej: Sede Norte, Oficina Principal, Bodega MedellÃ­n.</small>
                         @error('name')<div class="invalid-feedback">{{ $message }}</div>@enderror
                     </div>
                     <div class="form-group">

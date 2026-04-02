@@ -9,6 +9,13 @@
             Asignación #{{ $assignment->id }}
         </h1>
         <div>
+            {{-- Acceso directo al expediente del colaborador --}}
+            @if($assignment->collaborator)
+                <a href="{{ route('tech.expediente.show', $assignment->collaborator) }}"
+                   class="btn btn-sm btn-primary mr-1">
+                    <i class="fas fa-folder-open mr-1"></i> Expediente TI
+                </a>
+            @endif
             @can('tech.assets.assign')
                 @if($assignment->status === 'activa')
                     {{-- Solo Acta TI — módulo Tecnología --}}

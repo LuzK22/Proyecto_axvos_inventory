@@ -23,7 +23,32 @@
     </div>
 @endif
 
-@php($showTechColumns = $acta->hasTechAssets())
+@php
+    $showTechColumns = $acta->hasTechAssets();
+    // Soportar actas consolidadas, clásicas y de préstamo (loan_id sin assignment)
+    $isConsolidated  = $acta->isConsolidated();
+    $isLoanActa      = $acta->loan_id && $acta->assignment_id === null;
+
+    if ($isConsolidated) {
+        $recipient     = $acta->collaborator ?? null;
+        $recipientName = $acta->collaborator?->full_name ?? $acta->assignment?->recipient_name ?? '—';
+    } elseif ($isLoanActa) {
+        $recipient     = $acta->loan?->collaborator ?? null;
+        $recipientName = $acta->loan?->collaborator?->full_name
+            ?? $acta->loan?->destinationBranch?->name
+            ?? '—';
+    } else {
+        $recipient     = $acta->assignment?->collaborator ?? null;
+        $recipientName = $acta->assignment?->recipient_name ?? '—';
+    }
+
+    $destLabel   = $isLoanActa
+        ? ($acta->loan?->destination_type === 'branch' ? 'Sucursal' : 'Colaborador')
+        : \App\Models\Assignment::destinationLabel(
+            $acta->assignment?->destination_type ?? ($isConsolidated ? 'collaborator' : 'collaborator')
+          );
+    $totalAssets = $actaAssets->count();
+@endphp
 
 <div class="row">
     {{-- ── Columna principal ─────────────────────────────────── --}}
@@ -39,8 +64,26 @@
                     <span class="badge badge-{{ $acta->status_color }} ml-1" style="font-size:.72rem;">
                         {{ $acta->status_label }}
                     </span>
+                    @if($isConsolidated)
+                        <span class="badge badge-info ml-1" style="font-size:.68rem;">
+                            <i class="fas fa-layer-group mr-1"></i>Consolidada
+                        </span>
+                    @endif
                 </h6>
-                <div class="d-flex">
+                <div class="d-flex align-items-center gap-1">
+                    {{-- Botón volver al expediente (solo si tiene colaborador y no es acta de préstamo) --}}
+                    @if($recipient && !$isLoanActa)
+                        <a href="{{ route('tech.expediente.show', $recipient) }}"
+                           class="btn btn-sm btn-outline-primary mr-1" title="Ver expediente TI">
+                            <i class="fas fa-folder-open mr-1"></i> Expediente
+                        </a>
+                    @elseif($isLoanActa && $acta->loan_id)
+                        @php $loanRoute = $acta->loan?->asset?->type?->category === 'TI' ? 'tech.loans.show' : 'assets.loans.show'; @endphp
+                        <a href="{{ route($loanRoute, $acta->loan_id) }}"
+                           class="btn btn-sm btn-outline-primary mr-1" title="Ver préstamo">
+                            <i class="fas fa-handshake mr-1"></i> Ver Préstamo
+                        </a>
+                    @endif
                     <a href="{{ route('actas.preview', $acta) }}" target="_blank"
                        class="btn btn-sm btn-outline-secondary mr-1" title="Vista previa PDF">
                         <i class="fas fa-eye mr-1"></i> Vista previa
@@ -68,21 +111,34 @@
                     </div>
                     <div class="col-sm-4">
                         <small class="text-muted d-block">Destino</small>
-                        <strong>{{ \App\Models\Assignment::destinationLabel($acta->assignment->destination_type ?? 'collaborator') }}</strong>
+                        <strong>{{ $destLabel }}</strong>
                     </div>
                     <div class="col-sm-4">
                         <small class="text-muted d-block">Receptor</small>
-                        <strong>{{ $acta->assignment->recipient_name }}</strong>
+                        <strong>{{ $recipientName }}</strong>
                     </div>
                     <div class="col-sm-4 mt-2">
                         <small class="text-muted d-block">Colaborador</small>
-                        <strong>{{ $acta->assignment->collaborator->full_name ?? '—' }}</strong>
+                        <strong>{{ $recipient?->full_name ?? '—' }}</strong>
+                    </div>
+                    <div class="col-sm-4 mt-2">
+                        <small class="text-muted d-block">Activos incluidos</small>
+                        <strong>{{ $totalAssets }} activo{{ $totalAssets !== 1 ? 's' : '' }}</strong>
                     </div>
                     <div class="col-sm-4 mt-2">
                         <small class="text-muted d-block">Fecha generación</small>
                         <strong>{{ $acta->created_at->format('d/m/Y H:i') }}</strong>
                     </div>
                 </div>
+                @if($isConsolidated && $acta->assignments->isNotEmpty())
+                    <div class="mt-2 p-2 rounded" style="background:#eff6ff;border-left:3px solid #3b82f6;">
+                        <small class="text-muted">
+                            <i class="fas fa-info-circle mr-1 text-primary"></i>
+                            Agrupa <strong>{{ $acta->assignments->count() }}</strong> asignación{{ $acta->assignments->count() !== 1 ? 'es' : '' }}:
+                            {{ $acta->assignments->pluck('id')->map(fn($id) => '#'.$id)->implode(', ') }}
+                        </small>
+                    </div>
+                @endif
                 @if($acta->notes)
                     <div class="mt-2 p-2 rounded" style="background:#f8fafc;border-left:3px solid #cbd5e1;">
                         <small class="text-muted">Notas:</small> {{ $acta->notes }}
@@ -138,56 +194,88 @@
             </div>
         </div>
 
-        <div class="card shadow-sm mb-3" style="border-top:3px solid #2563eb;">
-            <div class="card-header py-2">
-                <h6 class="mb-0 font-weight-bold">
-                    <i class="fas fa-edit mr-1 text-primary"></i> Edición web del acta
+        <div class=”card shadow-sm mb-3” style=”border-top:3px solid #2563eb;”>
+            <div class=”card-header py-2 d-flex align-items-center justify-content-between”>
+                <h6 class=”mb-0 font-weight-bold”>
+                    <i class=”fas fa-edit mr-1 text-primary”></i> Completar datos del acta
                 </h6>
+                @if($template && $totalAssets > 0)
+                    <span class=”badge badge-success” style=”font-size:.7rem;”>
+                        <i class=”fas fa-robot mr-1”></i>
+                        {{ $totalAssets }} activo{{ $totalAssets !== 1 ? 's' : '' }} detectado{{ $totalAssets !== 1 ? 's' : '' }}
+                    </span>
+                @endif
             </div>
-            <div class="card-body">
+            <div class=”card-body”>
                 @if(!$template)
-                    <div class="alert alert-warning mb-0">
-                        No hay una plantilla activa para esta categoría. Activa una plantilla antes de editar o generar el Excel.
+                    <div class=”alert alert-warning mb-0”>
+                        <i class=”fas fa-exclamation-triangle mr-1”></i>
+                        No hay plantilla activa para este tipo de acta.
+                        <a href="{{ match (strtoupper($acta->asset_category ?? 'TI')) { 'OTRO' => route('admin.acta-templates.otro'), 'ALL' => route('admin.acta-templates.mixta'), default => route('admin.acta-templates.ti') } }}"
+                           class="alert-link">
+                            Ir a Plantillas de Acta
+                        </a>
+                        <a href=”{{ route('admin.acta-templates.create.ti') }}” class=”alert-link”>Sube una plantilla</a>
+                        con marcadores <code>@{{campo}}</code> y AXVOS la configurará automáticamente.
                     </div>
                 @elseif(in_array($acta->status, [\App\Models\Acta::STATUS_COMPLETADA, \App\Models\Acta::STATUS_ANULADA]))
-                    <div class="alert alert-light border mb-0">
-                        Esta acta está cerrada. La edición web quedó bloqueada para proteger el Excel y el PDF finales.
-                    </div>
-                @elseif($editableFields->isEmpty())
-                    <div class="alert alert-light border mb-0">
-                        La plantilla activa no tiene campos editables de cabecera. Puedes configurar campos no iterables en la plantilla para habilitar esta edición web.
+                    <div class=”alert alert-light border mb-0”>
+                        <i class=”fas fa-lock mr-1 text-muted”></i>
+                        Acta cerrada — edición bloqueada.
                     </div>
                 @else
-                    <form method="POST" action="{{ route('actas.fields.update', $acta) }}">
+                    {{-- Datos auto-completados (solo lectura) --}}
+                    @if($autoPreview->isNotEmpty())
+                    <div class=”mb-3 p-3 rounded” style=”background:#f0fdf4;border:1px solid #bbf7d0;”>
+                        <p class=”mb-2” style=”font-size:.75rem;text-transform:uppercase;color:#166534;font-weight:600;”>
+                            <i class=”fas fa-robot mr-1”></i> Completado automáticamente por AXVOS
+                        </p>
+                        <div class=”row”>
+                            @foreach($autoPreview->take(10) as $ap)
+                            <div class=”col-md-6 mb-1”>
+                                <small class=”text-muted d-block” style=”font-size:.7rem;”>{{ $ap['label'] }}</small>
+                                <span style=”font-size:.82rem;font-weight:500;”>{{ $ap['value'] ?: '—' }}</span>
+                            </div>
+                            @endforeach
+                        </div>
+                    </div>
+                    @endif
+
+                    {{-- Campos manuales (el gestor los completa) --}}
+                    @if($editableFields->isNotEmpty())
+                    <form method=”POST” action=”{{ route('actas.fields.update', $acta) }}”>
                         @csrf
-                        <div class="row">
+                        <p class=”mb-2” style=”font-size:.75rem;text-transform:uppercase;color:#92400e;font-weight:600;”>
+                            <i class=”fas fa-pencil-alt mr-1”></i> Completa estos datos
+                        </p>
+                        <div class=”row”>
                             @foreach($editableFields as $field)
-                                <div class="col-md-{{ $field['input_type'] === 'textarea' ? '12' : '6' }}">
-                                    <div class="form-group">
-                                        <label class="font-weight-bold">{{ $field['label'] }}</label>
+                                <div class=”col-md-{{ $field['input_type'] === 'textarea' ? '12' : '6' }}”>
+                                    <div class=”form-group”>
+                                        <label class=”font-weight-bold” style=”font-size:.82rem;”>{{ $field['label'] }}</label>
                                         @if($field['input_type'] === 'textarea')
-                                            <textarea name="fields[{{ $field['key'] }}]" rows="3" class="form-control">{{ old('fields.'.$field['key'], $field['value']) }}</textarea>
+                                            <textarea name=”fields[{{ $field['key'] }}]” rows=”3”
+                                                      class=”form-control form-control-sm”>{{ old('fields.'.$field['key'], $field['value']) }}</textarea>
                                         @else
-                                            <input
-                                                type="{{ $field['input_type'] }}"
-                                                name="fields[{{ $field['key'] }}]"
-                                                class="form-control"
-                                                value="{{ old('fields.'.$field['key'], $field['value']) }}">
+                                            <input type=”{{ $field['input_type'] }}”
+                                                   name=”fields[{{ $field['key'] }}]”
+                                                   class=”form-control form-control-sm”
+                                                   value=”{{ old('fields.'.$field['key'], $field['value']) }}”>
                                         @endif
-                                        <small class="text-muted d-block mt-1"><code>{{ $field['key'] }}</code></small>
                                     </div>
                                 </div>
                             @endforeach
                         </div>
-
-                        <div class="alert alert-light border mb-3">
-                            <strong>Importante:</strong> los datos por activo se generan automáticamente desde la asignación. En actas TI ya se incluyen “Etiqueta Inventario” y “Activo Fijo” en la vista y en la exportación.
-                        </div>
-
-                        <button class="btn btn-primary">
-                            <i class="fas fa-save mr-1"></i> Guardar edición web
+                        <button class=”btn btn-primary btn-sm”>
+                            <i class=”fas fa-save mr-1”></i> Guardar y generar documento
                         </button>
                     </form>
+                    @else
+                        <div class=”alert alert-light border mb-0” style=”font-size:.83rem;”>
+                            <i class=”fas fa-check-circle text-success mr-1”></i>
+                            Todos los campos de la plantilla son auto-completados. Puedes generar el PDF directamente.
+                        </div>
+                    @endif
                 @endif
             </div>
         </div>
@@ -199,50 +287,49 @@
 
         {{-- Excel (plantilla configurable) --}}
         <div class="card shadow-sm mb-3" style="border-top:3px solid #16a34a;">
-            <div class="card-body">
-                <p class="font-weight-bold mb-2" style="font-size:.85rem;">
+            <div class="card-header py-2">
+                <h6 class="mb-0 font-weight-bold" style="font-size:.85rem;">
                     <i class="fas fa-file-excel mr-1" style="color:#16a34a;"></i> Excel del Acta
-                </p>
+                </h6>
+            </div>
+            <div class="card-body">
 
+                {{-- Paso 1: Generar Excel borrador desde la edición web --}}
+                <p class="text-muted mb-1" style="font-size:.75rem;text-transform:uppercase;letter-spacing:.04em;">
+                    <span class="badge badge-secondary mr-1">1</span> Generar borrador
+                </p>
                 <form method="POST" action="{{ route('actas.excel.draft.generate', $acta) }}" class="mb-2">
                     @csrf
-                    <button class="btn btn-sm btn-success btn-block" {{ in_array($acta->status, [\App\Models\Acta::STATUS_COMPLETADA, \App\Models\Acta::STATUS_ANULADA]) ? 'disabled' : '' }}>
+                    <button class="btn btn-sm btn-success btn-block"
+                            {{ in_array($acta->status, [\App\Models\Acta::STATUS_COMPLETADA, \App\Models\Acta::STATUS_ANULADA]) ? 'disabled' : '' }}>
                         <i class="fas fa-magic mr-1"></i> Generar Excel desde edición web
                     </button>
                 </form>
 
                 @if($acta->xlsx_draft_path)
-                    <a href="{{ route('actas.excel.draft.download', $acta) }}" class="btn btn-sm btn-outline-success btn-block mb-2">
-                        <i class="fas fa-download mr-1"></i> Descargar borrador
+                    <a href="{{ route('actas.excel.draft.download', $acta) }}" class="btn btn-sm btn-outline-success btn-block mb-3">
+                        <i class="fas fa-download mr-1"></i> Descargar Excel borrador
                     </a>
-                @endif
 
-                @if(!in_array($acta->status, [\App\Models\Acta::STATUS_COMPLETADA, \App\Models\Acta::STATUS_ANULADA]))
-                    <form method="POST" action="{{ route('actas.excel.final.upload', $acta) }}" enctype="multipart/form-data" class="mb-2">
+                    {{-- Paso 2: Generar PDF final desde el borrador --}}
+                    <p class="text-muted mb-1" style="font-size:.75rem;text-transform:uppercase;letter-spacing:.04em;">
+                        <span class="badge badge-secondary mr-1">2</span> Generar PDF final
+                    </p>
+                    <form method="POST" action="{{ route('actas.pdf.final.generate', $acta) }}" class="mb-2">
                         @csrf
-                        <div class="custom-file mb-2">
-                            <input type="file" name="excel_final" class="custom-file-input" id="excelFinalFile" accept=".xlsx" required>
-                            <label class="custom-file-label" for="excelFinalFile">Subir Excel final editado</label>
-                        </div>
-                        <button class="btn btn-sm btn-outline-primary btn-block">
-                            <i class="fas fa-upload mr-1"></i> Guardar Excel final
+                        <button class="btn btn-sm btn-danger btn-block">
+                            <i class="fas fa-file-pdf mr-1"></i> Generar PDF final (desde Excel)
                         </button>
                     </form>
                 @endif
 
-                @if($acta->xlsx_final_path)
-                    <a href="{{ route('actas.excel.final.download', $acta) }}" class="btn btn-sm btn-outline-primary btn-block mb-2">
-                        <i class="fas fa-file-download mr-1"></i> Descargar Excel final
+                @if($acta->pdf_path)
+                    <a href="{{ route('actas.preview', $acta) }}" target="_blank"
+                       class="btn btn-sm btn-outline-secondary btn-block">
+                        <i class="fas fa-eye mr-1"></i> Vista previa PDF
                     </a>
                 @endif
 
-                <hr class="my-2">
-                <form method="POST" action="{{ route('actas.pdf.final.generate', $acta) }}">
-                    @csrf
-                    <button class="btn btn-sm btn-danger btn-block">
-                        <i class="fas fa-file-pdf mr-1"></i> Generar PDF final (desde Excel)
-                    </button>
-                </form>
             </div>
         </div>
 
@@ -418,6 +505,15 @@
             return;
         }
         document.getElementById('internalSignData').value = pad.toDataURL('image/png');
+    });
+})();
+
+// Oculta enlace legado con comillas tipogrÃ¡ficas que genera URL invÃ¡lida.
+(function () {
+    document.querySelectorAll('a').forEach((a) => {
+        if (a.textContent.trim() === 'Sube una plantilla') {
+            a.style.display = 'none';
+        }
     });
 })();
 </script>

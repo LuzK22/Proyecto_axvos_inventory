@@ -128,9 +128,9 @@ class AssignmentController extends Controller
                 ->withInput();
         }
 
-        $acta = null;
+        $assignment = null;
 
-        DB::transaction(function () use ($request, $collaborator, $assets, $assignedStatus, &$acta) {
+        DB::transaction(function () use ($request, $collaborator, $assets, $assignedStatus, &$assignment) {
 
             $assignment = Assignment::create([
                 'collaborator_id' => $collaborator->id,
@@ -154,20 +154,16 @@ class AssignmentController extends Controller
 
                 $asset->update(['status_id' => $assignedStatus->id]);
             }
-
-            // Generar acta de ENTREGA automÃ¡tica para TI (si aplica y sin duplicar)
-            $acta = Acta::generateDeliveryForAssignment($assignment, 'TI', auth()->user());
         });
 
-        $msg = 'AsignaciÃ³n creada correctamente.';
-        if ($acta) {
-            $msg .= ' Se generÃ³ el Acta de Entrega TI.';
-            return redirect()->route('actas.show', $acta)->with('success', $msg);
-        }
-
+        // Redirigir al expediente TI con modal de post-asignación
         return redirect()
-            ->route('tech.assignments.index')
-            ->with('success', $msg);
+            ->route('tech.expediente.show', [
+                'collaborator'     => $collaborator,
+                'nuevo_assignment' => $assignment->id,
+                'mostrar_modal'    => 1,
+            ])
+            ->with('success', 'Asignación creada correctamente.');
     }
 
     /* =========================================================

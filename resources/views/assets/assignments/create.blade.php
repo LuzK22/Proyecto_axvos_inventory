@@ -99,7 +99,7 @@
                         @endforeach
                     </select>
                     <small class="text-muted">
-                        El area no existe?
+                        ¿El area no existe?
                         <a href="{{ route('areas.create') }}" target="_blank">Crear nueva area</a>
                     </small>
                 </div>
@@ -300,9 +300,9 @@ function setDestination(type) {
             : 'Colaborador <span class="text-danger">*</span>';
     }
 
-    const areaSelect = document.getElementById('areaSelect');
+    const areaSelect     = document.getElementById('areaSelect');
     const poolAreaSelect = document.getElementById('poolAreaSelect');
-    if (areaSelect) areaSelect.disabled = type !== 'area';
+    if (areaSelect)     areaSelect.disabled     = type !== 'area';
     if (poolAreaSelect) poolAreaSelect.disabled = type !== 'pool';
 
     document.getElementById('destDescText').textContent = cfg.desc;

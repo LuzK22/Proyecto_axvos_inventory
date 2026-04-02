@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\AssetType;
+use App\Models\Subcategory;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -10,43 +11,69 @@ class CategoriesController extends Controller
 {
     public function index()
     {
-        // Get unique subcategories grouped with type counts
-        $categories = AssetType::select('subcategory', 'category', DB::raw('count(*) as total'))
-            ->whereNotNull('subcategory')
-            ->groupBy('subcategory', 'category')
-            ->orderBy('category')
-            ->orderBy('subcategory')
-            ->get();
+        // Load all registered subcategories with a count from asset_types (0 if none)
+        $subcategoryRows = Subcategory::orderBy('category')->orderBy('name')->get()
+            ->map(function ($sub) {
+                $sub->total = AssetType::where('subcategory', $sub->name)
+                    ->where('category', $sub->category)
+                    ->count();
+                return $sub;
+            });
+
+        // Map to same shape as before for the view
+        $categories = $subcategoryRows->map(function ($sub) {
+            return (object) [
+                'subcategory' => $sub->name,
+                'category'    => $sub->category,
+                'total'       => $sub->total,
+            ];
+        });
 
         return view('admin.categories.index', compact('categories'));
     }
 
     public function store(Request $request)
     {
-        // Subcategories don't have their own table — they're text on asset_types.
-        // This endpoint just validates and returns info; actual assignment is on asset_type create/edit.
         $request->validate([
             'subcategory' => 'required|string|max:60',
             'category'    => 'required|in:TI,OTRO',
         ]);
 
-        return back()->with('success', 'Subcategoría registrada. Asígnala al crear tipos de activo.');
+        $exists = Subcategory::where('name', $request->subcategory)
+            ->where('category', $request->category)
+            ->exists();
+
+        if ($exists) {
+            return back()->withErrors(['subcategory' => 'Ya existe esa subcategoría para la categoría seleccionada.']);
+        }
+
+        Subcategory::create([
+            'name'     => $request->subcategory,
+            'category' => $request->category,
+        ]);
+
+        return back()->with('success', 'Subcategoría "' . $request->subcategory . '" registrada para ' . $request->category . '.');
     }
 
     public function update(Request $request, $id)
     {
-        // Rename a subcategory across all asset_types
         $request->validate([
             'subcategory'     => 'required|string|max:60',
             'old_subcategory' => 'required|string',
             'category'        => 'required|in:TI,OTRO',
         ]);
 
+        // Rename in subcategories table
+        Subcategory::where('name', $request->old_subcategory)
+            ->where('category', $request->category)
+            ->update(['name' => $request->subcategory]);
+
+        // Rename across all asset_types
         AssetType::where('subcategory', $request->old_subcategory)
             ->where('category', $request->category)
             ->update(['subcategory' => $request->subcategory]);
 
-        return back()->with('success', 'Subcategoría renombrada en todos los tipos de activo.');
+        return back()->with('success', 'Subcategoría renombrada correctamente.');
     }
 
     public function destroy($id)

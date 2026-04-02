@@ -39,7 +39,6 @@ class AssetTypeController extends Controller
         $request->validate([
             'name'        => 'required|string|max:255',
             'category'    => 'required|in:TI,OTRO',
-            // Subcategoría: solo aplica a OTRO (ej: Mobiliario, Enseres)
             'subcategory' => 'nullable|string|max:100',
         ]);
 
@@ -50,7 +49,7 @@ class AssetTypeController extends Controller
             'name'        => $request->name,
             'code'        => $code,
             'category'    => $request->category,
-            'subcategory' => $request->category === 'OTRO' ? $request->subcategory : null,
+            'subcategory' => $request->filled('subcategory') ? trim($request->subcategory) : null,
             'active'      => true,
             'created_by'  => auth()->id(),
         ]);
@@ -87,7 +86,7 @@ class AssetTypeController extends Controller
 
         $assetType->update([
             'name'        => $request->name,
-            'subcategory' => $assetType->category === 'OTRO' ? $request->subcategory : null,
+            'subcategory' => $request->filled('subcategory') ? trim($request->subcategory) : null,
             'active'      => $request->boolean('active', true),
         ]);
 

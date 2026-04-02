@@ -98,6 +98,31 @@
                     </div>
                 </div>
 
+                <div class="form-group">
+                    <label class="font-weight-bold">
+                        Nombre del equipo
+                        <small class="text-muted font-weight-normal">(portÃ¡til, PC de escritorio, servidor)</small>
+                    </label>
+                    <input type="text" name="hostname" class="form-control @error('hostname') is-invalid @enderror"
+                           placeholder="Ej: PC-CONTABILIDAD-01, LAPTOP-JUAN01"
+                           value="{{ old('hostname', $asset->hostname) }}">
+                    @error('hostname')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                    <small class="text-muted">Campo manual y diferente al cÃ³digo interno.</small>
+                </div>
+
+                <div class="form-group">
+                    <label class="font-weight-bold">
+                        Usuario de dominio
+                        <small class="text-muted font-weight-normal">(portátil, PC, servidor, torre)</small>
+                    </label>
+                    <input type="text" name="domain_user" id="domain_user_input"
+                           class="form-control @error('domain_user') is-invalid @enderror"
+                           placeholder="Ej: jgarcia, mlopez"
+                           value="{{ old('domain_user', $asset->domain_user) }}">
+                    @error('domain_user')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                    <small class="text-muted">Usuario de dominio asignado por la empresa.</small>
+                </div>
+
                 <div class="form-group mb-0">
                     <label class="font-weight-bold">
                         Código Activo Fijo
@@ -136,7 +161,7 @@
                     </div>
                     <div class="col-md-6">
                         <div class="form-group">
-                            <label class="font-weight-bold">Sucursal <span class="text-danger">*</span></label>
+                            <label class="font-weight-bold">Sucursal (sede) <span class="text-danger">*</span></label>
                             <select name="branch_id" class="form-control" required>
                                 <option value="">Seleccionar sucursal...</option>
                                 @foreach($branches as $branch)
@@ -146,6 +171,7 @@
                                     </option>
                                 @endforeach
                             </select>
+                            <small class="text-muted d-block mt-1">La ciudad se define en la configuraciÃ³n de la sucursal.</small>
                         </div>
                     </div>
                 </div>
@@ -333,7 +359,11 @@
 
 @section('js')
 <script>
-$(function(){ $('[data-toggle="tooltip"]').tooltip(); });
+$(function(){
+    $('[data-toggle="tooltip"]').tooltip();
+    bindDomainUserVisibility();
+    toggleDomainUserByType();
+});
 function toggleProvider() {
     const val = document.getElementById('property_type').value;
     const row = document.getElementById('provider_row');
@@ -344,6 +374,25 @@ function toggleProvider() {
         row.style.display = 'none';
         input.value = '';
     }
+}
+
+function bindDomainUserVisibility() {
+    const typeSelect = document.querySelector('select[name="asset_type_id"]');
+    if (!typeSelect) return;
+    typeSelect.addEventListener('change', toggleDomainUserByType);
+}
+
+function toggleDomainUserByType() {
+    const input = document.getElementById('domain_user_input');
+    const row = input ? input.closest('.form-group') : null;
+    const typeSelect = document.querySelector('select[name="asset_type_id"]');
+    if (!row || !input || !typeSelect) return;
+
+    const selectedText = (typeSelect.options[typeSelect.selectedIndex]?.text || '').toLowerCase();
+    const appliesByType = /(portatil|portátil|laptop|pc|escritorio|servidor|torre)/.test(selectedText);
+    const keepVisibleByData = (input.value || '').trim() !== '';
+
+    row.style.display = (appliesByType || keepVisibleByData) ? '' : 'none';
 }
 </script>
 @stop

@@ -43,18 +43,23 @@
         </div>
     </div>
 
-    {{-- Tabs por TIPO de acta --}}
+    {{-- Selector de tipo: solo se muestra cuando no hay tipo preseleccionado --}}
+    @php
+        $typeMeta = [
+            'all'        => ['label'=>'Todas',      'icon'=>'file-signature', 'color'=>'secondary', 'hex'=>'#475569'],
+            'entrega'    => ['label'=>'Entrega',    'icon'=>'hand-holding',   'color'=>'primary',   'hex'=>'#1d4ed8'],
+            'devolucion' => ['label'=>'Devolución', 'icon'=>'undo',           'color'=>'warning',   'hex'=>'#92400e'],
+            'prestamo'   => ['label'=>'Préstamo',   'icon'=>'handshake',      'color'=>'info',      'hex'=>'#0369a1'],
+            'baja'       => ['label'=>'Baja',       'icon'=>'ban',            'color'=>'danger',    'hex'=>'#b91c1c'],
+        ];
+        $activeMeta = $typeMeta[$typeTab] ?? $typeMeta['all'];
+    @endphp
+
+    @if($typeTab === 'all')
+    {{-- Vista general: mostrar todos los tipos como tabs --}}
     <div class="card-body pb-0 pt-2 border-bottom">
         <div class="d-flex flex-wrap" style="gap:6px;">
-            @php
-                $typeTabs = [
-                    'all'        => ['label'=>'Todas',      'icon'=>'file-signature', 'color'=>'secondary'],
-                    'entrega'    => ['label'=>'Entrega',    'icon'=>'hand-holding',   'color'=>'primary'],
-                    'devolucion' => ['label'=>'Devolución', 'icon'=>'undo',           'color'=>'warning'],
-                    'baja'       => ['label'=>'Baja',       'icon'=>'ban',            'color'=>'danger'],
-                ];
-            @endphp
-            @foreach($typeTabs as $tKey => $tCfg)
+            @foreach($typeMeta as $tKey => $tCfg)
             <a href="{{ request()->fullUrlWithQuery(['type' => $tKey, 'filter' => $filter, 'category' => $category]) }}"
                class="btn btn-sm {{ $typeTab === $tKey ? 'btn-'.$tCfg['color'] : 'btn-outline-'.$tCfg['color'] }} mb-2">
                 <i class="fas fa-{{ $tCfg['icon'] }} mr-1"></i>
@@ -64,6 +69,38 @@
             @endforeach
         </div>
     </div>
+    @else
+    {{-- Vista filtrada: solo contexto activo + enlace para ver todas --}}
+    <div class="card-body py-2 border-bottom d-flex align-items-center justify-content-between"
+         style="background:#fafbfc;">
+        <div class="d-flex align-items-center" style="gap:10px;">
+            <span style="display:inline-flex;align-items:center;justify-content:center;
+                         width:30px;height:30px;border-radius:7px;
+                         background:{{ $activeMeta['hex'] }}18;flex-shrink:0;">
+                <i class="fas fa-{{ $activeMeta['icon'] }}" style="color:{{ $activeMeta['hex'] }};font-size:.8rem;"></i>
+            </span>
+            <div>
+                <span class="font-weight-bold" style="font-size:.85rem;color:#1e293b;">
+                    {{ $activeMeta['label'] }}
+                </span>
+                <span class="text-muted" style="font-size:.78rem;">
+                    &nbsp;·&nbsp;{{ $counts[$typeTab] ?? 0 }} acta(s)
+                    @if($category) &nbsp;·&nbsp;
+                        @if($category === 'TI')
+                            <span class="badge badge-primary" style="font-size:.62rem;">TI</span>
+                        @else
+                            <span class="badge" style="background:#ede9fe;color:#6d28d9;font-size:.62rem;">OTRO</span>
+                        @endif
+                    @endif
+                </span>
+            </div>
+        </div>
+        <a href="{{ request()->fullUrlWithQuery(['type' => 'all']) }}"
+           class="btn btn-xs btn-outline-secondary" style="font-size:.74rem;">
+            <i class="fas fa-list mr-1"></i> Ver todos los tipos
+        </a>
+    </div>
+    @endif
 
     {{-- Filtros por estado --}}
     <div class="card-body pb-0 pt-2">

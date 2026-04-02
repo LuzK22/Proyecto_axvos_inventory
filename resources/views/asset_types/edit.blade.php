@@ -53,26 +53,35 @@
                                value="{{ old('name', $assetType->name) }}" required autofocus>
                     </div>
 
-                    {{-- Subcategoría: solo para Otros Activos --}}
-                    @if($assetType->category === 'OTRO')
+                    {{-- Subcategoría: aplica a TI y OTRO --}}
                     <div class="form-group">
                         <label class="font-weight-bold">Subcategoría</label>
                         <input type="text" name="subcategory" class="form-control"
-                               placeholder="Ej: Mobiliario, Enseres, Electrodomésticos..."
+                               placeholder="{{ $assetType->category === 'TI' ? 'Ej: Portátiles y Móviles, Periféricos, Pantallas...' : 'Ej: Mobiliario, Enseres, Electrodomésticos...' }}"
                                value="{{ old('subcategory', $assetType->subcategory) }}"
                                list="subcategoryList">
                         <datalist id="subcategoryList">
-                            <option value="Mobiliario">
-                            <option value="Enseres">
-                            <option value="Electrodomésticos">
-                            <option value="Redes y Conectividad">
-                            <option value="Seguridad">
-                            <option value="Transporte">
-                            <option value="Herramientas">
+                            @if($assetType->category === 'TI')
+                                <option value="Portátiles">
+                                <option value="Móviles">
+                                <option value="Periféricos">
+                                <option value="Pantallas">
+                                <option value="Impresión">
+                                <option value="Almacenamiento">
+                                <option value="Red y Conectividad">
+                                <option value="Energía">
+                            @else
+                                <option value="Mobiliario">
+                                <option value="Enseres">
+                                <option value="Electrodomésticos">
+                                <option value="Redes y Conectividad">
+                                <option value="Seguridad">
+                                <option value="Transporte">
+                                <option value="Herramientas">
+                            @endif
                         </datalist>
-                        <small class="text-muted">Agrupa tipos similares bajo una misma categoría.</small>
+                        <small class="text-muted">Agrupa tipos similares bajo una misma subcategoría.</small>
                     </div>
-                    @endif
 
                     <div class="form-group mb-0">
                         <label class="font-weight-bold">Código interno generado</label>

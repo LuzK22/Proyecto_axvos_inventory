@@ -90,12 +90,25 @@
             <strong>{{ $current['label'] }}</strong>
             — {{ $loans->total() }} registro(s)
         </span>
+        <button type="button" id="btn-toggle-det"
+                class="btn btn-xs btn-outline-secondary"
+                onclick="toggleDet()" style="font-size:.73rem;">
+            <i class="fas fa-table mr-1"></i>
+            <span id="lbl-det">Ver detalles</span>
+        </button>
     </div>
     <div class="card-body p-0">
         <table class="table table-sm table-hover mb-0">
             <thead class="thead-light" style="font-size:.75rem;text-transform:uppercase;">
                 <tr>
-                    <th class="pl-3">#</th><th>Activo</th><th>Colaborador</th><th>Sucursal</th>
+                    <th class="pl-3">#</th>
+                    <th>Activo</th>
+                    <th class="col-det">Marca / Modelo</th>
+                    <th class="col-det">Serial</th>
+                    <th class="col-det">Etiqueta</th>
+                    <th class="col-det">Cód. Fijo</th>
+                    <th>Colaborador</th>
+                    <th>Sucursal</th>
                     <th>Inicio</th><th>Vence</th><th>Estado</th><th>Por</th><th></th>
                 </tr>
             </thead>
@@ -106,6 +119,19 @@
                     <td>
                         <code style="font-size:.78rem;">{{ $loan->asset?->internal_code }}</code>
                         <small class="text-muted d-block">{{ $loan->asset?->type?->name }}</small>
+                    </td>
+                    <td class="col-det">
+                        <small class="font-weight-bold">{{ $loan->asset?->brand ?? '—' }}</small>
+                        <small class="text-muted d-block">{{ $loan->asset?->model ?? '' }}</small>
+                    </td>
+                    <td class="col-det">
+                        <small style="font-family:monospace;">{{ $loan->asset?->serial ?? '—' }}</small>
+                    </td>
+                    <td class="col-det">
+                        <small style="font-family:monospace;">{{ $loan->asset?->asset_tag ?? '—' }}</small>
+                    </td>
+                    <td class="col-det">
+                        <small style="font-family:monospace;">{{ $loan->asset?->fixed_asset_code ?? '—' }}</small>
                     </td>
                     <td>
                         <small class="font-weight-bold">{{ $loan->collaborator?->full_name }}</small>
@@ -202,4 +228,34 @@
         </div>
     </div>
 </div>
+@stop
+
+@section('js')
+<script>
+(function () {
+    var LS_KEY = 'axvos_det_ti_loans';
+    var shown  = localStorage.getItem(LS_KEY) === '1';
+
+    function applyDet() {
+        document.querySelectorAll('.col-det').forEach(function (el) {
+            el.style.display = shown ? '' : 'none';
+        });
+        var lbl = document.getElementById('lbl-det');
+        var btn = document.getElementById('btn-toggle-det');
+        if (lbl) lbl.textContent = shown ? 'Ocultar detalles' : 'Ver detalles';
+        if (btn) {
+            btn.classList.toggle('btn-secondary',         shown);
+            btn.classList.toggle('btn-outline-secondary', !shown);
+        }
+    }
+
+    window.toggleDet = function () {
+        shown = !shown;
+        localStorage.setItem(LS_KEY, shown ? '1' : '0');
+        applyDet();
+    };
+
+    document.addEventListener('DOMContentLoaded', applyDet);
+})();
+</script>
 @stop

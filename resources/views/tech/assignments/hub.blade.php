@@ -52,18 +52,18 @@
                     <div class="hub-btn-icon"><i class="fas fa-th-list"></i></div>
                     <div class="hub-btn-text">
                         <strong>Ver Asignaciones</strong>
-                        <small>Asignaciones activas</small>
+                        <small>Activos activos por colaborador</small>
                     </div>
                 </a>
             </div>
 
             <div class="col-md-4 mb-3">
                 <a href="{{ route('tech.assignments.search') }}" class="hub-btn"
-                   style="background:linear-gradient(135deg,#3730a3,#4338ca);">
+                   style="background:linear-gradient(135deg,#0369a1,#0284c7);">
                     <div class="hub-btn-icon"><i class="fas fa-search"></i></div>
                     <div class="hub-btn-text">
-                        <strong>Buscar Colaborador</strong>
-                        <small>Ver activos asignados</small>
+                        <strong>Buscar colaborador</strong>
+                        <small>Colaboradores con activos TI</small>
                     </div>
                 </a>
             </div>

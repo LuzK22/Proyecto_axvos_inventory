@@ -79,6 +79,12 @@
                     <dt class="col-5 text-muted">Serial:</dt>
                     <dd class="col-7"><code>{{ $asset->serial }}</code></dd>
 
+                    <dt class="col-5 text-muted">Nombre equipo:</dt>
+                    <dd class="col-7">{{ $asset->hostname ?? '—' }}</dd>
+
+                    <dt class="col-5 text-muted">Usuario dominio:</dt>
+                    <dd class="col-7">{{ $asset->domain_user ?? '-' }}</dd>
+
                     <dt class="col-5 text-muted">Etiqueta Inventario:</dt>
                     <dd class="col-7">
                         @if($asset->asset_tag)
@@ -106,8 +112,11 @@
                         <span class="badge badge-light border">{{ $asset->property_type }}</span>
                     </dd>
 
-                    <dt class="col-5 text-muted">Sucursal:</dt>
+                    <dt class="col-5 text-muted">Sucursal (sede):</dt>
                     <dd class="col-7">{{ $asset->branch?->name ?? '—' }}</dd>
+
+                    <dt class="col-5 text-muted">Ciudad:</dt>
+                    <dd class="col-7">{{ $asset->branch?->city ?? '—' }}</dd>
 
                     @if($asset->provider_name)
                         <dt class="col-5 text-muted">Proveedor:</dt>
@@ -125,7 +134,9 @@
         {{-- Información Financiera --}}
         <div class="card shadow-sm">
             <div class="card-header py-2" style="border-left:4px solid #059669;">
-                <h6 class="mb-0 font-weight-bold"><i class="fas fa-dollar-sign mr-1" style="color:#059669;"></i> Información Financiera</h6>
+                <h6 class="mb-0 font-weight-bold">
+                    <i class="fas fa-dollar-sign mr-1" style="color:#059669;"></i> Información Financiera
+                </h6>
             </div>
             <div class="card-body py-2">
                 <dl class="row small mb-0">
@@ -134,14 +145,53 @@
                         @if($asset->purchase_value)
                             <strong>$ {{ number_format($asset->purchase_value, 2) }}</strong>
                         @else
-                            <span class="text-muted">No registrado</span>
+                            <span class="text-muted">—</span>
                         @endif
                     </dd>
 
                     <dt class="col-5 text-muted">Fecha compra:</dt>
-                    <dd class="col-7">
-                        {{ $asset->purchase_date?->format('d/m/Y') ?? '—' }}
-                    </dd>
+                    <dd class="col-7">{{ $asset->purchase_date?->format('d/m/Y') ?? '—' }}</dd>
+
+                    @if($asset->useful_life_years || $asset->depreciation_method)
+                        <dt class="col-12 text-muted mt-2 mb-1" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;">
+                            <i class="fas fa-calculator mr-1" style="color:#059669;"></i> NIIF NIC 16
+                        </dt>
+
+                        <dt class="col-5 text-muted">Vida útil:</dt>
+                        <dd class="col-7">
+                            {{ $asset->useful_life_years ? $asset->useful_life_years . ' años' : '—' }}
+                        </dd>
+
+                        <dt class="col-5 text-muted">Método depr.:</dt>
+                        <dd class="col-7">
+                            @php
+                                $metodos = [
+                                    'linea_recta'          => 'Línea recta',
+                                    'saldo_decreciente'    => 'Saldo decreciente',
+                                    'unidades_produccion'  => 'Unidades de producción',
+                                    'no_deprecia'          => 'No deprecia',
+                                ];
+                            @endphp
+                            {{ $metodos[$asset->depreciation_method] ?? ($asset->depreciation_method ?? '—') }}
+                        </dd>
+
+                        <dt class="col-5 text-muted">Valor residual:</dt>
+                        <dd class="col-7">
+                            {{ $asset->residual_value !== null ? '$ ' . number_format($asset->residual_value, 2) : '—' }}
+                        </dd>
+
+                        <dt class="col-5 text-muted">Inicio depr.:</dt>
+                        <dd class="col-7">{{ $asset->depreciation_start_date?->format('d/m/Y') ?? '—' }}</dd>
+
+                        <dt class="col-5 text-muted">Cuenta PUC:</dt>
+                        <dd class="col-7">
+                            @if($asset->account_code)
+                                <code>{{ $asset->account_code }}</code>
+                            @else
+                                —
+                            @endif
+                        </dd>
+                    @endif
                 </dl>
             </div>
         </div>

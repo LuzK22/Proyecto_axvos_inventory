@@ -22,7 +22,7 @@
 
     <table class="table table-bordered">
         <tr>
-            <th>Nombre</th>
+            <th>Sucursal (sede)</th>
             <th>Ciudad</th>
             <th>Estado</th>
         </tr>
@@ -36,4 +36,3 @@
         @endforeach
     </table>
 @stop
-

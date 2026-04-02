@@ -364,7 +364,8 @@ return [
     */
     ['header' => 'AUDITORÍA', 'can' => 'audit.view'],
 
-    ['text' => 'Auditoría Global',  'icon' => 'fas fa-search-dollar', 'route' => 'audit.hub',            'can' => 'audit.view'],
+    ['text' => 'Auditoría Global',  'icon' => 'fas fa-search-dollar', 'route' => 'audit.hub',       'can' => 'audit.view'],
+    ['text' => 'Gestor Documental', 'icon' => 'fas fa-file-signature','route' => 'documents.hub',   'can' => 'audit.view'],
 
     /*
     |--------------------------------------------------------------------------

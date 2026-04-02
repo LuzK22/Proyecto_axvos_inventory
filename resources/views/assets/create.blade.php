@@ -110,6 +110,18 @@
 
                 <div class="form-group mb-0">
                     <label class="font-weight-bold">
+                        Nombre del equipo
+                        <small class="text-muted font-weight-normal">(si aplica)</small>
+                    </label>
+                    <input type="text" name="hostname" class="form-control @error('hostname') is-invalid @enderror"
+                           placeholder="Ej: PC-CONTABILIDAD-01, LAPTOP-JUAN01"
+                           value="{{ old('hostname') }}">
+                    @error('hostname')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                    <small class="text-muted">Este dato es manual y diferente al cÃ³digo interno.</small>
+                </div>
+
+                <div class="form-group mb-0">
+                    <label class="font-weight-bold">
                         Código Activo Fijo
                         <i class="fas fa-question-circle text-muted" style="font-size:.8rem;"
                            data-toggle="tooltip" title="Código de contabilidad — SAP, Siigo, etc."></i>
@@ -147,7 +159,7 @@
                     </div>
                     <div class="col-md-6">
                         <div class="form-group">
-                            <label class="font-weight-bold">Sucursal <span class="text-danger">*</span></label>
+                            <label class="font-weight-bold">Sucursal (sede) <span class="text-danger">*</span></label>
                             <select name="branch_id" class="form-control" required>
                                 <option value="">Seleccionar sucursal...</option>
                                 @foreach($branches as $branch)
@@ -157,6 +169,7 @@
                                 @endforeach
                             </select>
                             @error('branch_id')<small class="text-danger">{{ $message }}</small>@enderror
+                            <small class="text-muted d-block mt-1">La ciudad se define en la configuraciÃ³n de la sucursal.</small>
                         </div>
                     </div>
                 </div>

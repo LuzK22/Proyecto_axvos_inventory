@@ -155,8 +155,76 @@
         </div>
     </div>
 </div>
+{{-- ── Carta / Acta de Préstamo ──────────────────────────────────── --}}
+@php $loanActas = $loan->relationLoaded('actas') ? $loan->actas : collect(); @endphp
+<div class="card shadow-sm mb-3" style="border-left:4px solid #6d28d9;">
+    <div class="card-header py-2 d-flex align-items-center justify-content-between">
+        <h6 class="mb-0 font-weight-bold">
+            <i class="fas fa-file-contract mr-1" style="color:#6d28d9;"></i> Carta de Préstamo
+        </h6>
+        @if($loanActas->isEmpty())
+        <form method="POST" action="{{ route('actas.generate.from.loan', $loan) }}">
+            @csrf
+            <button type="submit" class="btn btn-sm" style="background:#6d28d9;color:#fff;border-color:#6d28d9;font-size:.78rem;">
+                <i class="fas fa-plus mr-1"></i> Generar Carta
+            </button>
+        </form>
+        @else
+        <a href="{{ route('actas.index', ['type' => 'prestamo', 'category' => 'OTRO']) }}"
+           class="btn btn-sm btn-outline-secondary" style="font-size:.78rem;">
+            <i class="fas fa-list mr-1"></i> Ver todas
+        </a>
+        @endif
+    </div>
+    <div class="card-body p-0">
+        @if($loanActas->isEmpty())
+        <div class="py-3 px-3 text-muted small d-flex align-items-center" style="gap:10px;">
+            <i class="fas fa-info-circle" style="color:#c4b5fd;font-size:1.1rem;"></i>
+            <span>No se ha generado carta de préstamo. Puede generarla opcionalmente.</span>
+        </div>
+        @else
+        <table class="table table-sm mb-0">
+            <thead class="thead-light" style="font-size:.72rem;text-transform:uppercase;">
+                <tr>
+                    <th class="pl-3">Nº Acta</th>
+                    <th>Estado</th>
+                    <th>Firmas</th>
+                    <th>Generada</th>
+                    <th style="width:60px;"></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($loanActas as $acta)
+                <tr>
+                    <td class="pl-3 font-weight-bold" style="font-size:.82rem;">{{ $acta->acta_number }}</td>
+                    <td>
+                        <span class="badge badge-{{ $acta->status_color }}" style="font-size:.65rem;">
+                            {{ $acta->status_label }}
+                        </span>
+                    </td>
+                    <td>
+                        @php $signed = $acta->signatures->where('signed_at','!=',null)->count(); $total = $acta->signatures->count(); @endphp
+                        <span class="badge {{ $signed===$total && $total>0 ? 'badge-success' : 'badge-warning' }}" style="font-size:.65rem;">
+                            {{ $signed }}/{{ $total }}
+                        </span>
+                    </td>
+                    <td class="text-muted" style="font-size:.8rem;">{{ $acta->created_at->format('d/m/Y') }}</td>
+                    <td>
+                        <a href="{{ route('actas.show', $acta) }}" class="btn btn-xs btn-outline-primary" title="Ver acta">
+                            <i class="fas fa-eye"></i>
+                        </a>
+                    </td>
+                </tr>
+                @endforeach
+            </tbody>
+        </table>
+        @endif
+    </div>
+</div>
 @stop
 
 @section('css')
-<style>.table-borderless td{border:none!important;padding:.2rem .5rem;}</style>
+<style>
+.table-borderless td{border:none!important;padding:.2rem .5rem;}
+</style>
 @stop

@@ -27,5 +27,15 @@ class ActaExcelTemplateField extends Model
     {
         return $this->belongsTo(ActaExcelTemplate::class, 'acta_excel_template_id');
     }
+
+    /**
+     * True si AXVOS puede resolver este campo automáticamente desde la BD.
+     * False = el gestor debe completarlo manualmente desde la web.
+     */
+    public function getIsAutoAttribute(): bool
+    {
+        $info = ActaExcelTemplate::KNOWN_FIELDS[$this->field_key] ?? null;
+        return $info ? (bool) ($info['auto'] ?? false) : false;
+    }
 }
 

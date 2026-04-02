@@ -7,10 +7,12 @@ use App\Models\Acta;
 use App\Models\ActaFieldValue;
 use App\Models\ActaSignature;
 use App\Models\Assignment;
+use App\Models\Loan;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use Symfony\Component\Process\Process;
 
@@ -47,7 +49,8 @@ class ActaController extends Controller
         }
 
         // Filtro por tipo de acta
-        if (in_array($typeTab, [Acta::TYPE_ENTREGA, Acta::TYPE_DEVOLUCION, Acta::TYPE_BAJA])) {
+        $validTypes = [Acta::TYPE_ENTREGA, Acta::TYPE_DEVOLUCION, Acta::TYPE_BAJA, 'prestamo'];
+        if (in_array($typeTab, $validTypes)) {
             $query->where('acta_type', $typeTab);
         }
 
@@ -63,6 +66,7 @@ class ActaController extends Controller
             'all'                 => Acta::when($category, fn($q) => $q->where('asset_category', $category))->count(),
             Acta::TYPE_ENTREGA    => Acta::where('acta_type', Acta::TYPE_ENTREGA)->when($category, fn($q) => $q->where('asset_category', $category))->count(),
             Acta::TYPE_DEVOLUCION => Acta::where('acta_type', Acta::TYPE_DEVOLUCION)->when($category, fn($q) => $q->where('asset_category', $category))->count(),
+            'prestamo'            => Acta::where('acta_type', 'prestamo')->when($category, fn($q) => $q->where('asset_category', $category))->count(),
             Acta::TYPE_BAJA       => Acta::where('acta_type', Acta::TYPE_BAJA)->when($category, fn($q) => $q->where('asset_category', $category))->count(),
         ];
 
@@ -78,6 +82,12 @@ class ActaController extends Controller
             'assignment.collaborator',
             'assignment.area',
             'assignment.assignmentAssets.asset.type',
+            'collaborator',             // actas consolidadas (assignment_id nullable)
+            'assignments.collaborator', // pivot acta_assignments
+            'loan.asset.type',          // actas de préstamo
+            'loan.asset.branch',
+            'loan.collaborator',
+            'loan.destinationBranch',
             'generatedBy',
             'signatures.signerUser',
             'fieldValues',
@@ -91,8 +101,10 @@ class ActaController extends Controller
         $actaAssets = $acta->scopedAssignmentAssets();
         $manual = $acta->fieldValues->pluck('value', 'field_key')->toArray();
 
+        // Solo mostrar campos NO auto-completados y NO iterables (los que debe completar el gestor)
         $editableFields = collect($template?->fields ?? [])
             ->where('is_iterable', false)
+            ->filter(fn($f) => !$f->is_auto)
             ->map(function ($field) use ($acta, $manual) {
                 $default = $manual[$field->field_key] ?? $this->resolveBaseFieldValue($acta, $field->field_key);
                 return [
@@ -104,6 +116,16 @@ class ActaController extends Controller
             })
             ->values();
 
+        // Valores auto para mostrar como preview en la vista (solo lectura)
+        $autoPreview = collect($template?->fields ?? [])
+            ->where('is_iterable', false)
+            ->filter(fn($f) => $f->is_auto)
+            ->map(fn($f) => [
+                'label' => $f->field_label,
+                'value' => $this->resolveBaseFieldValue($acta, $f->field_key),
+            ])
+            ->values();
+
         $mySignature = $acta->signatures->where('signer_user_id', auth()->id())->first()
             ?? $acta->signatures->where('signer_role', 'responsible')->where('signed_at', null)->first();
 
@@ -112,8 +134,9 @@ class ActaController extends Controller
             'template',
             'actaAssets',
             'editableFields',
+            'autoPreview',
             'mySignature'
-));
+        ));
 }
 
     /*
@@ -128,72 +151,167 @@ class ActaController extends Controller
             'assignment.collaborator',
             'assignment.area',
             'assignment.assignmentAssets.asset.type',
+            'assignment.assignmentAssets.asset.branch',
+            'loan.asset.type',
+            'loan.asset.branch',
+            'loan.collaborator',
             'generatedBy',
             'fieldValues',
         ]);
 
         $template = $acta->activeExcelTemplate();
         if (!$template) {
-            return back()->with('error', 'No hay una plantilla Excel activa para este tipo/categoría de acta.');
+            return back()->with('error', 'No hay una plantilla activa para este tipo/categoría de acta. Súbela en Admin → Plantillas.');
         }
 
         $template->load('fields');
 
-        $spreadsheet = IOFactory::load(storage_path('app/' . $template->file_path));
-        $sheet = $spreadsheet->getActiveSheet();
-
-        $category = strtoupper($acta->asset_category ?? 'TI');
         $assets = $acta->scopedAssignmentAssets()->values();
-
         if ($assets->isEmpty()) {
             return back()->with('error', 'Esta acta no tiene activos de la categoría correspondiente.');
         }
 
-        // Mapa de valores base (no iterables)
-        $recipientName = $acta->assignment->collaborator?->full_name
-            ?? ($acta->assignment->area ? ('Área: ' . $acta->assignment->area->name) : '—');
+        // Resolver colaborador (préstamo no tiene assignment)
+        $collaborator  = $acta->assignment?->collaborator ?? $acta->loan?->collaborator;
+        $baseDate      = $acta->assignment?->assignment_date ?? $acta->loan?->start_date;
+        $recipientName = $collaborator?->full_name
+            ?? ($acta->assignment?->area ? 'Área: ' . $acta->assignment->area->name : '—');
+        $branchName    = $collaborator?->branch?->name
+            ?? $acta->assignment?->assignmentAssets->first()?->asset?->branch?->name
+            ?? $acta->loan?->asset?->branch?->name
+            ?? '';
+        $cityName      = $collaborator?->branch?->city
+            ?? $acta->assignment?->assignmentAssets->first()?->asset?->branch?->city
+            ?? $acta->loan?->asset?->branch?->city
+            ?? '';
+        $userDomain    = $this->resolveActaUserDomain($acta, $collaborator, $assets);
 
+        // Mapa de valores base: todos los campos que AXVOS conoce
         $base = [
-            'acta_number'          => $acta->acta_number,
-            'acta_type'            => $acta->type_label,
-            'asset_category'       => $category,
-            'collaborator_name'    => $acta->assignment->collaborator?->full_name,
-            'collaborator_document'=> $acta->assignment->collaborator?->document,
-            'collaborator_email'   => $acta->assignment->collaborator?->email,
-            'area_name'            => $acta->assignment->area?->name,
-            'recipient_name'       => $recipientName,
-            'assignment_date'      => optional($acta->assignment->assignment_date)->format('d/m/Y'),
-            'delivery_date'        => now()->format('d/m/Y'),
-            'responsible_name'     => $acta->generatedBy?->name,
-            'responsible_email'    => $acta->generatedBy?->email,
+            'acta_number'           => $acta->acta_number,
+            'acta_type'             => $acta->type_label,
+            'asset_category'        => strtoupper($acta->asset_category ?? 'TI'),
+            'delivery_date'         => now()->format('d/m/Y'),
+            'assignment_date'       => optional($baseDate)->format('d/m/Y') ?? '',
+            'collaborator_name'     => $collaborator?->full_name ?? '',
+            'collaborator_document' => $collaborator?->document ?? '',
+            'collaborator_position' => $collaborator?->position ?? '',
+            'collaborator_email'    => $collaborator?->email ?? '',
+            'user_domain'           => $userDomain,
+            'username_domain'       => $userDomain,
+            'area_name'             => $acta->assignment?->area?->name ?? '',
+            'branch_name'           => $branchName,
+            'city_name'             => $cityName,
+            'city'                  => $cityName,
+            'recipient_name'        => $recipientName,
+            'responsible_name'      => $acta->generatedBy?->name ?? '',
+            'responsible_email'     => $acta->generatedBy?->email ?? '',
         ];
 
-        // Valores manuales/dinámicos guardados por acta
+        // Valores manuales guardados desde la edición web
         $manual = $acta->fieldValues->pluck('value', 'field_key')->toArray();
 
-        $startRow = $template->assets_start_row ?? 1;
+        // Combinar: manual tiene prioridad sobre base
+        $allValues = array_merge($base, $manual);
 
-        foreach ($template->fields as $field) {
-            $key = $field->field_key;
+        $ext = strtolower($template->template_type ?? 'xlsx');
 
-            if ($field->is_iterable) {
-                // Ej: A{row}, B{row}
-                foreach ($assets as $idx => $aa) {
-                    $row = $startRow + $idx;
-                    $cell = str_replace('{row}', (string) $row, $field->cell_ref);
-                    $sheet->setCellValue($cell, $this->resolveIterableValue($key, $aa));
+        if ($ext === 'docx') {
+            return $this->generateDocxDraft($acta, $template, $allValues, $assets);
+        }
+
+        return $this->generateXlsxDraft($acta, $template, $allValues, $assets);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Generación XLSX — búsqueda y reemplazo de {{marcadores}}
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private function generateXlsxDraft(Acta $acta, $template, array $allValues, $assets)
+    {
+        $spreadsheet = IOFactory::load(storage_path('app/' . $template->file_path));
+        $sheet       = $spreadsheet->getActiveSheet();
+
+        // ── Paso 1: Detectar la fila de la tabla de activos ──────────────────
+        $iterRowIndex = null;
+        $iterColMap   = []; // 'B' => 'asset_serial', etc.
+
+        foreach ($sheet->getRowIterator() as $rowIndex => $row) {
+            $cellIter = $row->getCellIterator();
+            $cellIter->setIterateOnlyExistingCells(true);
+            $rowColMap = [];
+
+            foreach ($cellIter as $cell) {
+                $val = trim((string) ($cell->getValue() ?? ''));
+                if (preg_match('/^\{\{(\w+)\}\}$/', $val, $m)) {
+                    $info = \App\Models\ActaExcelTemplate::KNOWN_FIELDS[$m[1]] ?? null;
+                    if ($info && ($info['iterable'] ?? false)) {
+                        $rowColMap[$cell->getColumn()] = $m[1];
+                    }
                 }
-            } else {
-                $value = $manual[$key] ?? $base[$key] ?? '';
-                $sheet->setCellValue($field->cell_ref, $value);
+            }
+
+            if (!empty($rowColMap)) {
+                $iterRowIndex = $rowIndex;
+                $iterColMap   = $rowColMap;
+                break;
             }
         }
 
+        // ── Paso 2: Reemplazar {{marcadores}} no iterables en todas las celdas ─
+        foreach ($sheet->getRowIterator() as $rowIndex => $row) {
+            if ($rowIndex === $iterRowIndex) {
+                continue; // la fila de activos se trata aparte
+            }
+
+            $cellIter = $row->getCellIterator();
+            $cellIter->setIterateOnlyExistingCells(true);
+
+            foreach ($cellIter as $cell) {
+                $val = (string) ($cell->getValue() ?? '');
+                if (!str_contains($val, '{{')) {
+                    continue;
+                }
+
+                $newVal = preg_replace_callback('/\{\{(\w+)\}\}/', function ($m) use ($allValues) {
+                    return $allValues[$m[1]] ?? '';
+                }, $val);
+
+                if ($newVal !== $val) {
+                    $cell->setValue($newVal);
+                }
+            }
+        }
+
+        // ── Paso 3: Llenar tabla de activos ──────────────────────────────────
+        if ($iterRowIndex !== null) {
+            foreach ($assets as $idx => $aa) {
+                $targetRow = $iterRowIndex + $idx;
+                foreach ($iterColMap as $col => $key) {
+                    $sheet->setCellValue($col . $targetRow, $this->resolveIterableValue($key, $aa));
+                }
+            }
+        } elseif ($template->assets_start_row) {
+            // Fallback: usar el mapeo clásico de la BD (cell_ref = "B{row}")
+            $startRow = $template->assets_start_row;
+            foreach ($template->fields->where('is_iterable', true) as $field) {
+                foreach ($assets as $idx => $aa) {
+                    $row  = $startRow + $idx;
+                    $cell = str_replace('{row}', (string) $row, $field->cell_ref);
+                    $sheet->setCellValue($cell, $this->resolveIterableValue($field->field_key, $aa));
+                }
+            }
+        }
+
+        // ── Guardar ──────────────────────────────────────────────────────────
+        // Autodiligenciado inteligente por etiquetas visibles (sin marcadores).
+        $this->fillXlsxByLabelHeuristics($sheet, $allValues, $assets);
+
         $filename = $acta->acta_number . '-draft.xlsx';
-        $path = 'actas/excel-drafts/' . $filename;
+        $path     = 'actas/excel-drafts/' . $filename;
 
         Storage::makeDirectory('actas/excel-drafts');
-        $tmp = tempnam(sys_get_temp_dir(), 'acta_xlsx_');
+        $tmp    = tempnam(sys_get_temp_dir(), 'acta_xlsx_');
         $writer = IOFactory::createWriter($spreadsheet, 'Xlsx');
         $writer->save($tmp);
         Storage::put($path, file_get_contents($tmp));
@@ -201,9 +319,126 @@ class ActaController extends Controller
 
         $acta->update(['xlsx_draft_path' => $path]);
 
-        return redirect()
-            ->route('actas.show', $acta)
-            ->with('success', 'Excel borrador generado correctamente.');
+        return redirect()->route('actas.show', $acta)->with('success', 'Documento generado correctamente.');
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Generación DOCX — búsqueda y reemplazo de {{marcadores}}
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private function generateDocxDraft(Acta $acta, $template, array $allValues, $assets)
+    {
+        if (!class_exists(\PhpOffice\PhpWord\IOFactory::class)) {
+            return back()->with('error', 'Soporte para .docx no disponible. Ejecuta: composer require phpoffice/phpword');
+        }
+
+        $phpWord = \PhpOffice\PhpWord\IOFactory::load(storage_path('app/' . $template->file_path));
+
+        // Reemplazos simples en todo el documento
+        $replacements = [];
+        foreach ($allValues as $key => $value) {
+            $replacements['{{' . $key . '}}'] = (string) $value;
+        }
+
+        // Reemplazar en secciones/párrafos/tablas
+        foreach ($phpWord->getSections() as $section) {
+            $this->replaceDocxSection($section, $replacements, $assets);
+        }
+
+        $filename = $acta->acta_number . '-draft.docx';
+        $path     = 'actas/excel-drafts/' . $filename;
+
+        Storage::makeDirectory('actas/excel-drafts');
+        $tmp    = tempnam(sys_get_temp_dir(), 'acta_docx_');
+        $writer = \PhpOffice\PhpWord\IOFactory::createWriter($phpWord, 'Word2007');
+        $writer->save($tmp);
+        Storage::put($path, file_get_contents($tmp));
+        @unlink($tmp);
+
+        $acta->update(['xlsx_draft_path' => $path]);
+
+        return redirect()->route('actas.show', $acta)->with('success', 'Documento Word generado correctamente.');
+    }
+
+    private function replaceDocxSection($section, array $replacements, $assets): void
+    {
+        foreach ($section->getElements() as $element) {
+            if ($element instanceof \PhpOffice\PhpWord\Element\Table) {
+                foreach ($element->getRows() as $rowIdx => $row) {
+                    $isAssetRow = false;
+                    // Detectar si la fila tiene marcadores iterables
+                    foreach ($row->getCells() as $cell) {
+                        foreach ($cell->getElements() as $par) {
+                            $text = $this->docxElementText($par);
+                            foreach (\App\Models\ActaExcelTemplate::KNOWN_FIELDS as $key => $info) {
+                                if (($info['iterable'] ?? false) && str_contains($text, '{{' . $key . '}}')) {
+                                    $isAssetRow = true;
+                                    break 3;
+                                }
+                            }
+                        }
+                    }
+
+                    if ($isAssetRow) {
+                        // Llenar la primera fila con activo 0, y simplemente reemplazar
+                        $firstAsset = $assets->first();
+                        if ($firstAsset) {
+                            $assetRepl = [];
+                            foreach (\App\Models\ActaExcelTemplate::KNOWN_FIELDS as $key => $info) {
+                                if ($info['iterable'] ?? false) {
+                                    $assetRepl['{{' . $key . '}}'] = $this->resolveIterableValue($key, $firstAsset);
+                                }
+                            }
+                            $this->replaceDocxRow($row, array_merge($replacements, $assetRepl));
+                        }
+                    } else {
+                        $this->replaceDocxRow($row, $replacements);
+                    }
+                }
+            } elseif ($element instanceof \PhpOffice\PhpWord\Element\TextRun ||
+                      $element instanceof \PhpOffice\PhpWord\Element\Paragraph) {
+                $this->replaceDocxParagraph($element, $replacements);
+            }
+        }
+    }
+
+    private function replaceDocxRow($row, array $replacements): void
+    {
+        foreach ($row->getCells() as $cell) {
+            foreach ($cell->getElements() as $par) {
+                $this->replaceDocxParagraph($par, $replacements);
+            }
+        }
+    }
+
+    private function replaceDocxParagraph($element, array $replacements): void
+    {
+        if (!method_exists($element, 'getElements')) {
+            return;
+        }
+        foreach ($element->getElements() as $child) {
+            if ($child instanceof \PhpOffice\PhpWord\Element\Text) {
+                $text    = $child->getText();
+                $newText = strtr($text, $replacements);
+                if ($newText !== $text) {
+                    $child->setText($newText);
+                }
+            }
+        }
+    }
+
+    private function docxElementText($element): string
+    {
+        $text = '';
+        if (!method_exists($element, 'getElements')) {
+            return $text;
+        }
+        foreach ($element->getElements() as $child) {
+            if ($child instanceof \PhpOffice\PhpWord\Element\Text) {
+                $text .= $child->getText();
+            }
+        }
+        return $text;
     }
 
     public function downloadExcelDraft(Acta $acta)
@@ -286,19 +521,178 @@ class ActaController extends Controller
         return $this->generateExcelDraft($request, $acta);
     }
 
+    private function fillXlsxByLabelHeuristics($sheet, array $allValues, $assets): void
+    {
+        $maxRow      = (int) $sheet->getHighestRow();
+        $maxColIndex = Coordinate::columnIndexFromString($sheet->getHighestColumn());
+
+        // 1) Cabecera: buscar etiquetas visibles y escribir el dato a la derecha.
+        for ($row = 1; $row <= $maxRow; $row++) {
+            for ($col = 1; $col <= $maxColIndex; $col++) {
+                $raw = trim((string) ($sheet->getCellByColumnAndRow($col, $row)->getValue() ?? ''));
+                if ($raw === '' || strlen($raw) > 70) {
+                    continue;
+                }
+
+                $label = $this->normalizeTemplateLabel($raw);
+                $value = null;
+
+                if (str_contains($label, 'nombre completo') && str_contains($label, 'recibe')) {
+                    $value = $allValues['recipient_name'] ?? null;
+                } elseif (str_contains($label, 'nombre completo') && str_contains($label, 'entrega')) {
+                    $value = $allValues['responsible_name'] ?? null;
+                } elseif (str_contains($label, 'nombre completo')) {
+                    $value = $allValues['collaborator_name'] ?? null;
+                } elseif (str_contains($label, 'documento')) {
+                    $value = $allValues['collaborator_document'] ?? null;
+                } elseif (str_contains($label, 'correo')) {
+                    $value = $allValues['collaborator_email'] ?? null;
+                } elseif (str_contains($label, 'usuario dominio') || str_contains($label, 'usuario - dominio')) {
+                    $value = $allValues['user_domain'] ?? null;
+                } elseif ($label === 'area' || str_contains($label, ' area')) {
+                    $value = $allValues['area_name'] ?? null;
+                } elseif (str_contains($label, 'cargo')) {
+                    $value = $allValues['collaborator_position'] ?? null;
+                } elseif (str_contains($label, 'ciudad')) {
+                    $value = $allValues['city_name'] ?? null;
+                } elseif (str_contains($label, 'sucursal') || str_contains($label, 'sede')) {
+                    $value = $allValues['branch_name'] ?? null;
+                } elseif (str_starts_with($label, 'fecha')) {
+                    $value = $allValues['delivery_date'] ?? null;
+                }
+
+                if ($value !== null && $value !== '') {
+                    $this->writeValueToRightEmptyCell($sheet, $row, $col, (string) $value, $maxColIndex);
+                }
+            }
+        }
+
+        // 2) Tabla de activos: detectar encabezados y llenar filas.
+        $headerAliases = [
+            'asset_type'        => ['descripcion', 'tipo'],
+            'asset_brand_model' => ['marca y modelo', 'marca modelo'],
+            'asset_serial'      => ['serial', 'serie'],
+            'asset_hostname'    => ['nombre de equipo', 'nombre del equipo', 'nombre equipo'],
+            'fixed_asset_code'  => ['activo fijo', 'placa'],
+            'asset_status'      => ['estado'],
+        ];
+
+        $headerRow = null;
+        $colMap    = [];
+        for ($row = 1; $row <= $maxRow; $row++) {
+            $rowMap = [];
+            for ($col = 1; $col <= $maxColIndex; $col++) {
+                $label = $this->normalizeTemplateLabel((string) ($sheet->getCellByColumnAndRow($col, $row)->getValue() ?? ''));
+                if ($label === '') {
+                    continue;
+                }
+                foreach ($headerAliases as $field => $aliases) {
+                    foreach ($aliases as $alias) {
+                        if ($label === $alias || str_contains($label, $alias)) {
+                            $rowMap[$col] = $field;
+                            break 2;
+                        }
+                    }
+                }
+            }
+
+            $fieldsFound = array_values(array_unique(array_values($rowMap)));
+            if (count($fieldsFound) >= 3 && in_array('asset_serial', $fieldsFound, true)) {
+                $headerRow = $row;
+                $colMap    = $rowMap;
+                break;
+            }
+        }
+
+        if ($headerRow !== null && !empty($colMap)) {
+            foreach ($assets as $idx => $assignmentAsset) {
+                $targetRow = $headerRow + 1 + $idx;
+                foreach ($colMap as $col => $fieldKey) {
+                    $coordinate = Coordinate::stringFromColumnIndex((int) $col) . $targetRow;
+                    $value      = $this->resolveIterableValue($fieldKey, $assignmentAsset);
+                    if ($value === '') {
+                        continue;
+                    }
+                    $existing = trim((string) ($sheet->getCell($coordinate)->getValue() ?? ''));
+                    if ($existing === '') {
+                        $sheet->setCellValue($coordinate, $value);
+                    }
+                }
+            }
+        }
+    }
+
+    private function writeValueToRightEmptyCell($sheet, int $row, int $labelCol, string $value, int $maxColIndex): void
+    {
+        for ($col = $labelCol + 1; $col <= $maxColIndex; $col++) {
+            $current = trim((string) ($sheet->getCellByColumnAndRow($col, $row)->getValue() ?? ''));
+            if ($current !== '') {
+                continue;
+            }
+            $sheet->setCellValue(Coordinate::stringFromColumnIndex($col) . $row, $value);
+            return;
+        }
+    }
+
+    private function normalizeTemplateLabel(string $text): string
+    {
+        $normalized = strtolower(trim($text));
+        $normalized = str_replace(
+            ['á', 'é', 'í', 'ó', 'ú', 'ñ', 'Á', 'É', 'Í', 'Ó', 'Ú', 'Ñ'],
+            ['a', 'e', 'i', 'o', 'u', 'n', 'a', 'e', 'i', 'o', 'u', 'n'],
+            $normalized
+        );
+        $normalized = preg_replace('/[^a-z0-9]+/i', ' ', $normalized) ?? '';
+        return trim(preg_replace('/\s+/', ' ', $normalized) ?? '');
+    }
+
+    private function deriveUserDomain(?string $email): string
+    {
+        if (!$email || !str_contains($email, '@')) {
+            return '';
+        }
+
+        [$user] = explode('@', $email, 2);
+        return trim($user);
+    }
+
+    private function resolveActaUserDomain(Acta $acta, $collaborator = null, $assets = null): string
+    {
+        $assetsCollection = $assets ?? $acta->scopedAssignmentAssets();
+        $assetDomainUser = trim((string) (
+            $assetsCollection->first()?->asset?->domain_user
+            ?? $acta->loan?->asset?->domain_user
+            ?? ''
+        ));
+
+        if ($assetDomainUser !== '') {
+            return $assetDomainUser;
+        }
+
+        return $this->deriveUserDomain($collaborator?->email);
+    }
+
     private function resolveIterableValue(string $key, $assignmentAsset): string
     {
         $asset = $assignmentAsset->asset;
         return match ($key) {
-            'asset_internal_code', 'asset_code' => (string) ($asset?->internal_code ?? ''),
-            'asset_category' => (string) ($asset?->type?->category ?? ''),
-            'asset_type' => (string) ($asset?->type?->name ?? ''),
-            'asset_brand' => (string) ($asset?->brand ?? ''),
-            'asset_model' => (string) ($asset?->model ?? ''),
-            'asset_serial' => (string) ($asset?->serial ?? ''),
-            'asset_tag', 'inventory_tag' => (string) ($asset?->asset_tag ?? ''),
-            'fixed_asset_code' => (string) ($asset?->fixed_asset_code ?? ''),
-            default => '',
+            'asset_internal_code', 'asset_code'
+                                    => (string) ($asset?->internal_code ?? ''),
+            'asset_category_col'    => (string) ($asset?->type?->category ?? ''),
+            'asset_category'        => (string) ($asset?->type?->category ?? ''),
+            'asset_type'            => (string) ($asset?->type?->name ?? ''),
+            'asset_brand'           => (string) ($asset?->brand ?? ''),
+            'asset_model'           => (string) ($asset?->model ?? ''),
+            'asset_brand_model'     => trim(($asset?->brand ?? '') . ' ' . ($asset?->model ?? '')),
+            'asset_serial'          => (string) ($asset?->serial ?? ''),
+            'asset_hostname'        => (string) ($asset?->hostname ?? ''),
+            'asset_domain_user'     => (string) ($asset?->domain_user ?? ''),
+            'asset_tag', 'inventory_tag'
+                                    => (string) ($asset?->asset_tag ?? ''),
+            'fixed_asset_code'      => (string) ($asset?->fixed_asset_code ?? ''),
+            'asset_status'          => (string) ($asset?->status?->name ?? ''),
+            'asset_quantity'        => '1',
+            default                 => '',
         };
     }
 
@@ -307,22 +701,40 @@ class ActaController extends Controller
         $acta->loadMissing([
             'assignment.collaborator',
             'assignment.area',
+            'loan.collaborator',
             'generatedBy',
         ]);
 
-        $recipientName = $acta->assignment->collaborator?->full_name
-            ?? ($acta->assignment->area ? ('Área: ' . $acta->assignment->area->name) : '—');
+        // Actas de préstamo no tienen assignment — resolver desde loan
+        $collaborator  = $acta->assignment?->collaborator ?? $acta->loan?->collaborator;
+        $recipientName = $collaborator?->full_name
+            ?? ($acta->assignment?->area ? ('Área: ' . $acta->assignment->area->name) : '—');
+        $baseDate = $acta->assignment?->assignment_date ?? $acta->loan?->start_date;
+
+        $branchName = $collaborator?->branch?->name
+            ?? $acta->loan?->asset?->branch?->name
+            ?? '';
+        $cityName = $collaborator?->branch?->city
+            ?? $acta->loan?->asset?->branch?->city
+            ?? '';
+        $userDomain = $this->resolveActaUserDomain($acta, $collaborator);
 
         return (string) match ($key) {
             'acta_number'           => $acta->acta_number,
             'acta_type'             => $acta->type_label,
             'asset_category'        => $acta->asset_category_label,
-            'collaborator_name'     => $acta->assignment->collaborator?->full_name ?? '',
-            'collaborator_document' => $acta->assignment->collaborator?->document ?? '',
-            'collaborator_email'    => $acta->assignment->collaborator?->email ?? '',
-            'area_name'             => $acta->assignment->area?->name ?? '',
+            'collaborator_name'     => $collaborator?->full_name ?? '',
+            'collaborator_document' => $collaborator?->document ?? '',
+            'collaborator_position' => $collaborator?->position ?? '',
+            'collaborator_email'    => $collaborator?->email ?? '',
+            'user_domain'           => $userDomain,
+            'username_domain'       => $userDomain,
+            'area_name'             => $acta->assignment?->area?->name ?? '',
+            'branch_name'           => $branchName,
+            'city_name'             => $cityName,
+            'city'                  => $cityName,
             'recipient_name'        => $recipientName,
-            'assignment_date'       => optional($acta->assignment->assignment_date)->format('Y-m-d') ?? '',
+            'assignment_date'       => optional($baseDate)->format('Y-m-d') ?? '',
             'delivery_date'         => now()->format('Y-m-d'),
             'responsible_name'      => $acta->generatedBy?->name ?? '',
             'responsible_email'     => $acta->generatedBy?->email ?? '',
@@ -403,6 +815,23 @@ class ActaController extends Controller
         return redirect()
             ->route('actas.show', $acta)
             ->with('success', 'Acta generada correctamente. Puede enviarla para firma.');
+    }
+
+    /**
+     * Genera (o reutiliza) un Acta de Préstamo para un Loan dado.
+     * Accesible desde la vista show del préstamo TI o Otros Activos.
+     */
+    public function generateFromLoan(Loan $loan)
+    {
+        $loan->load(['asset.type', 'collaborator', 'destinationBranch']);
+
+        $acta = Acta::generateForLoan($loan, auth()->user());
+
+        $message = $acta->wasRecentlyCreated
+            ? 'Carta de préstamo generada correctamente.'
+            : 'Ya existe una carta de préstamo activa para este préstamo.';
+
+        return redirect()->route('actas.show', $acta)->with('success', $message);
     }
 
     /*

@@ -54,6 +54,11 @@ class Loan extends Model
         return $this->belongsTo(Branch::class, 'destination_branch_id');
     }
 
+    public function actas()
+    {
+        return $this->hasMany(\App\Models\Acta::class, 'loan_id');
+    }
+
     // ── Helpers ────────────────────────────────────────────────────────
 
     // Días restantes para la devolución (negativo = vencido)

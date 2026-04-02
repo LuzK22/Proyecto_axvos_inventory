@@ -102,6 +102,12 @@
                         <td><code style="font-size:.82rem;">{{ $asset->serial }}</code></td>
                     </tr>
                     @endif
+                    @if($asset->hostname)
+                    <tr>
+                        <td class="text-muted pl-0" style="font-size:.82rem;">Nombre equipo</td>
+                        <td>{{ $asset->hostname }}</td>
+                    </tr>
+                    @endif
                     @if($asset->asset_tag)
                     <tr>
                         <td class="text-muted pl-0" style="font-size:.82rem;">Etiqueta</td>
@@ -136,8 +142,12 @@
                         </td>
                     </tr>
                     <tr>
-                        <td class="text-muted pl-0" style="font-size:.82rem;">Sucursal</td>
+                        <td class="text-muted pl-0" style="font-size:.82rem;">Sucursal (sede)</td>
                         <td>{{ $asset->branch?->name ?? '—' }}</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted pl-0" style="font-size:.82rem;">Ciudad</td>
+                        <td>{{ $asset->branch?->city ?? '—' }}</td>
                     </tr>
                     @if($asset->provider_name)
                     <tr>

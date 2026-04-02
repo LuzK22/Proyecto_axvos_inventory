@@ -30,12 +30,18 @@ class AuditController extends Controller
 
     public function hub(Request $request)
     {
+        $stats = $this->globalStats();
+
+        // No tab specified → show landing hub with buttons
+        if (! $request->has('tab')) {
+            return view('audit.landing', compact('stats'));
+        }
+
         $tab       = $request->get('tab', 'ti');
         $branches  = Branch::where('active', true)->orderBy('name')->get();
         $tiTypes   = AssetType::where('category', 'TI')->orderBy('name')->get();
         $otroTypes = AssetType::where('category', 'OTRO')->orderBy('name')->get();
         $statuses  = Status::orderBy('name')->get();
-        $stats     = $this->globalStats();
 
         $data = match ($tab) {
             'otros'          => $this->queryOtros($request),
@@ -149,13 +155,15 @@ class AuditController extends Controller
 
     private function queryPrestamos(Request $r)
     {
-        $q = Loan::with(['asset.type', 'collaborator.branch', 'creator']);
-        if ($r->filled('loan_status'))  $q->where('status', $r->loan_status);
-        if ($r->filled('from'))         $q->where('start_date', '>=', $r->from);
-        if ($r->filled('to'))           $q->where('end_date', '<=', $r->to);
-        if ($r->filled('branch_id'))    $q->whereHas('collaborator',
+        $q = Loan::with(['asset.type', 'collaborator.branch', 'creator', 'destinationBranch']);
+        if ($r->filled('loan_status'))    $q->where('status', $r->loan_status);
+        if ($r->filled('loan_category'))  $q->whereHas('asset.type',
+            fn($sq) => $sq->where('category', $r->loan_category));
+        if ($r->filled('from'))           $q->where('start_date', '>=', $r->from);
+        if ($r->filled('to'))             $q->where('end_date', '<=', $r->to);
+        if ($r->filled('branch_id'))      $q->whereHas('collaborator',
             fn($sq) => $sq->where('branch_id', $r->branch_id));
-        if ($r->filled('collaborator')) $q->whereHas('collaborator',
+        if ($r->filled('collaborator'))   $q->whereHas('collaborator',
             fn($sq) => $sq->where('full_name', 'like', "%{$r->collaborator}%"));
         return $q->orderByDesc('start_date')->paginate(self::PER_PAGE)->withQueryString();
     }
@@ -183,6 +191,8 @@ class AuditController extends Controller
             if ($r->action === 'asignado') $q->whereNull('returned_at');
             if ($r->action === 'devuelto') $q->whereNotNull('returned_at');
         }
+        if ($r->filled('log_category')) $q->whereHas('asset.type',
+            fn($sq) => $sq->where('category', $r->log_category));
         if ($r->filled('from'))         $q->where('created_at', '>=', $r->from . ' 00:00:00');
         if ($r->filled('to'))           $q->where('created_at', '<=', $r->to . ' 23:59:59');
         if ($r->filled('branch_id'))    $q->whereHas('assignment.collaborator',
@@ -206,9 +216,9 @@ class AuditController extends Controller
             $a->asset_tag, $a->status?->name, $a->branch?->name,
             $a->property_type, $a->created_at?->format('d/m/Y'),
         ]);
-        return [$rows,
-            ['Codigo','Tipo','Marca','Modelo','Serial','Asset Tag','Estado','Sucursal','Propiedad','Fecha Ingreso'],
-            'auditoria_activos_ti_' . now()->format('Ymd_His') . '.csv'];
+        $allHeaders = ['Codigo','Tipo','Marca','Modelo','Serial','Asset Tag','Estado','Sucursal','Propiedad','Fecha Ingreso'];
+        [$headers, $filteredRows] = $this->filterExportColumns($r, $allHeaders, $rows);
+        return [$filteredRows, $headers, 'auditoria_activos_ti_' . now()->format('Ymd_His') . '.csv'];
     }
 
     private function exportOtros(Request $r): array
@@ -221,20 +231,22 @@ class AuditController extends Controller
             $a->asset_tag, $a->status?->name, $a->branch?->name,
             $a->property_type, $a->created_at?->format('d/m/Y'),
         ]);
-        return [$rows,
-            ['Codigo','Tipo','Marca','Modelo','Serial','Asset Tag','Estado','Sucursal','Propiedad','Fecha Ingreso'],
-            'auditoria_otros_activos_' . now()->format('Ymd_His') . '.csv'];
+        $allHeaders = ['Codigo','Tipo','Marca','Modelo','Serial','Asset Tag','Estado','Sucursal','Propiedad','Fecha Ingreso'];
+        [$headers, $filteredRows] = $this->filterExportColumns($r, $allHeaders, $rows);
+        return [$filteredRows, $headers, 'auditoria_otros_activos_' . now()->format('Ymd_His') . '.csv'];
     }
 
     private function exportPrestamos(Request $r): array
     {
         $q = Loan::with(['asset.type', 'collaborator.branch', 'creator']);
-        if ($r->filled('loan_status'))  $q->where('status', $r->loan_status);
-        if ($r->filled('from'))         $q->where('start_date', '>=', $r->from);
-        if ($r->filled('to'))           $q->where('end_date', '<=', $r->to);
-        if ($r->filled('branch_id'))    $q->whereHas('collaborator',
+        if ($r->filled('loan_status'))   $q->where('status', $r->loan_status);
+        if ($r->filled('loan_category')) $q->whereHas('asset.type',
+            fn($sq) => $sq->where('category', $r->loan_category));
+        if ($r->filled('from'))          $q->where('start_date', '>=', $r->from);
+        if ($r->filled('to'))            $q->where('end_date', '<=', $r->to);
+        if ($r->filled('branch_id'))     $q->whereHas('collaborator',
             fn($sq) => $sq->where('branch_id', $r->branch_id));
-        if ($r->filled('collaborator')) $q->whereHas('collaborator',
+        if ($r->filled('collaborator'))  $q->whereHas('collaborator',
             fn($sq) => $sq->where('full_name', 'like', "%{$r->collaborator}%"));
         $rows = $q->orderByDesc('start_date')->get()->map(fn($l) => [
             $l->id, $l->asset?->internal_code, $l->asset?->type?->name,
@@ -244,9 +256,9 @@ class AuditController extends Controller
             $l->returned_at?->format('d/m/Y H:i') ?? '',
             $l->status, $l->notes, $l->creator?->name,
         ]);
-        return [$rows,
-            ['ID','Activo','Tipo','Colaborador','Cedula','Sucursal','Inicio','Vence','Devuelto','Estado','Notas','Creado por'],
-            'auditoria_prestamos_' . now()->format('Ymd_His') . '.csv'];
+        $allHeaders = ['ID','Categoria','Activo','Tipo','Colaborador/Destino','Sucursal','Inicio','Vence','Devuelto','Estado','Notas','Creado por'];
+        [$headers, $filteredRows] = $this->filterExportColumns($r, $allHeaders, $rows);
+        return [$filteredRows, $headers, 'auditoria_prestamos_' . now()->format('Ymd_His') . '.csv'];
     }
 
     private function exportAsignaciones(Request $r): array
@@ -267,9 +279,9 @@ class AuditController extends Controller
             $a->assignmentAssets->pluck('asset.internal_code')->filter()->implode(', '),
             $a->status, $a->assignedBy?->name,
         ]);
-        return [$rows,
-            ['ID','Colaborador','Cedula','Sucursal','Modalidad','Fecha','Activos','Estado','Registrado por'],
-            'auditoria_asignaciones_' . now()->format('Ymd_His') . '.csv'];
+        $allHeaders = ['ID','Colaborador','Cedula','Sucursal','Modalidad','Fecha','Activos','Estado','Registrado por'];
+        [$headers, $filteredRows] = $this->filterExportColumns($r, $allHeaders, $rows);
+        return [$filteredRows, $headers, 'auditoria_asignaciones_' . now()->format('Ymd_His') . '.csv'];
     }
 
     /** Exporta activos dados de baja (TI y OTRO) con valor en libros NIIF */
@@ -306,11 +318,10 @@ class AuditController extends Controller
             $a->updated_at?->format('d/m/Y') ?? '',
         ]);
 
-        return [$data,
-            ['Cód. Inventario','Cód. Activo Fijo','Categoría','Tipo','Marca','Modelo',
-             'Serial','Motivo Baja','Valor Compra','Valor en Libros','Cuenta PUC',
-             'Sucursal','Fecha Baja'],
-            'bajas_activos_' . now()->format('Ymd_His') . '.csv'];
+        $allHeaders = ['Cód. Inventario','Cód. Activo Fijo','Categoría','Tipo','Marca','Modelo',
+             'Serial','Motivo Baja','Valor Compra','Valor en Libros','Cuenta PUC','Sucursal','Fecha Baja'];
+        [$headers, $filteredData] = $this->filterExportColumns($r, $allHeaders, $data);
+        return [$filteredData, $headers, 'bajas_activos_' . now()->format('Ymd_His') . '.csv'];
     }
 
     /** Exporta sesiones activas e históricas de usuarios (ISO 27001) */
@@ -498,15 +509,21 @@ class AuditController extends Controller
             if ($r->action === 'asignado') $q->whereNull('returned_at');
             if ($r->action === 'devuelto') $q->whereNotNull('returned_at');
         }
+        if ($r->filled('log_category')) $q->whereHas('asset.type',
+            fn($sq) => $sq->where('category', $r->log_category));
         if ($r->filled('from'))         $q->where('created_at', '>=', $r->from . ' 00:00:00');
         if ($r->filled('to'))           $q->where('created_at', '<=', $r->to . ' 23:59:59');
         if ($r->filled('branch_id'))    $q->whereHas('assignment.collaborator',
             fn($sq) => $sq->where('branch_id', $r->branch_id));
         if ($r->filled('collaborator')) $q->whereHas('assignment.collaborator',
             fn($sq) => $sq->where('full_name', 'like', "%{$r->collaborator}%"));
-        $rows = $q->orderByDesc('updated_at')->get()->map(fn($aa) => [
+
+        $allHeaders = ['Evento','Categoria','Activo','Tipo','Colaborador','Cedula','Sucursal','Asignacion #','Fecha Asignacion','Fecha Devolucion','Devuelto por'];
+        $allRows = $q->orderByDesc('updated_at')->get()->map(fn($aa) => [
             $aa->returned_at ? 'Devolucion' : 'Asignacion',
-            $aa->asset?->internal_code, $aa->asset?->type?->name,
+            $aa->asset?->type?->category ?? '',
+            $aa->asset?->internal_code,
+            $aa->asset?->type?->name,
             $aa->assignment?->collaborator?->full_name,
             $aa->assignment?->collaborator?->document,
             $aa->assignment?->collaborator?->branch?->name,
@@ -515,8 +532,28 @@ class AuditController extends Controller
             $aa->returned_at?->format('d/m/Y H:i') ?? '',
             $aa->returnedBy?->name ?? '',
         ]);
-        return [$rows,
-            ['Evento','Activo','Tipo','Colaborador','Cedula','Sucursal','Asignacion #','Fecha Asignacion','Fecha Devolucion','Devuelto por'],
-            'auditoria_log_' . now()->format('Ymd_His') . '.csv'];
+
+        [$headers, $rows] = $this->filterExportColumns($r, $allHeaders, $allRows);
+        return [$rows, $headers, 'auditoria_log_' . now()->format('Ymd_His') . '.csv'];
+    }
+
+    /* =========================================================
+     | HELPER: filtrar columnas del CSV según cols[] del request
+     ========================================================= */
+
+    private function filterExportColumns(Request $r, array $headers, $rows): array
+    {
+        if (! $r->filled('cols')) {
+            return [$headers, $rows];
+        }
+        $selected = array_map('intval', (array) $r->input('cols'));
+        $filteredHeaders = array_values(array_filter($headers,
+            fn($i) => in_array($i, $selected), ARRAY_FILTER_USE_KEY));
+        $filteredRows = $rows->map(function ($row) use ($selected) {
+            $arr = array_values((array) $row);
+            return array_values(array_filter($arr,
+                fn($i) => in_array($i, $selected), ARRAY_FILTER_USE_KEY));
+        });
+        return [$filteredHeaders, $filteredRows];
     }
 }

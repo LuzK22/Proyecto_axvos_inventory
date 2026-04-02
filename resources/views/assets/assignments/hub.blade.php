@@ -36,6 +36,17 @@
 
             @can('assets.assign')
             <div class="col-md-4 mb-3">
+                <a href="{{ route('assets.assignments.create') }}" class="hub-btn"
+                   style="background:linear-gradient(135deg,#7c3aed,#6d28d9);">
+                    <div class="hub-btn-icon"><i class="fas fa-plus-circle"></i></div>
+                    <div class="hub-btn-text">
+                        <strong>Nueva Asignación</strong>
+                        <small>A colaborador o área</small>
+                    </div>
+                </a>
+            </div>
+
+            <div class="col-md-4 mb-3">
                 <a href="{{ route('assets.assignments.index') }}" class="hub-btn"
                    style="background:linear-gradient(135deg,#1e40af,#2563eb);">
                     <div class="hub-btn-icon"><i class="fas fa-th-list"></i></div>
@@ -45,16 +56,14 @@
                     </div>
                 </a>
             </div>
-            @endcan
 
-            @can('assets.assign')
             <div class="col-md-4 mb-3">
-                <a href="{{ route('assets.assignments.create') }}" class="hub-btn"
-                   style="background:linear-gradient(135deg,#7c3aed,#6d28d9);">
-                    <div class="hub-btn-icon"><i class="fas fa-plus-circle"></i></div>
+                <a href="{{ route('assets.assignments.search') }}" class="hub-btn"
+                   style="background:linear-gradient(135deg,#0369a1,#0284c7);">
+                    <div class="hub-btn-icon"><i class="fas fa-search"></i></div>
                     <div class="hub-btn-text">
-                        <strong>Nueva Asignación</strong>
-                        <small>A colaborador o área</small>
+                        <strong>Buscar destinatario</strong>
+                        <small>Colaborador, responsable o área</small>
                     </div>
                 </a>
             </div>

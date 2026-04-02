@@ -18,6 +18,7 @@ use App\Http\Controllers\AssetTransitionController;
 use App\Http\Controllers\DeletionRequestController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\OtroAssetAssignmentController;
+use App\Http\Controllers\OtroExpedienteController;
 use App\Http\Controllers\AreaController;
 use App\Http\Controllers\ActaExcelTemplateController;
 use App\Http\Controllers\ActaExcelTemplateFieldController;
@@ -29,6 +30,7 @@ use App\Http\Controllers\CategoriesController;
 use App\Http\Controllers\PermissionController;
 use App\Http\Controllers\TwoFactorController;
 use App\Http\Controllers\SecurityController;
+use App\Http\Controllers\ExpedienteController;
 
 /*
 |--------------------------------------------------------------------------
@@ -305,6 +307,25 @@ Route::middleware(['auth', 'require.consent', 'require.2fa'])->group(function ()
                 ->name('assignments.collaborator.assets')
                 ->middleware('can:tech.assets.assign');
 
+            // ── EXPEDIENTE TI (por colaborador) ────────────────────────
+            Route::get('/expediente/{collaborator}', [ExpedienteController::class, 'showTi'])
+                ->name('expediente.show')
+                ->middleware('can:tech.assets.assign');
+
+            // FASE 3: Generar acta desde expediente
+            Route::post('/expediente/{collaborator}/acta', [ExpedienteController::class, 'generateActa'])
+                ->name('expediente.acta')
+                ->middleware('can:tech.assets.assign');
+
+            // FASE 4: Devolución desde expediente
+            Route::get('/expediente/{collaborator}/devolucion', [ExpedienteController::class, 'returnForm'])
+                ->name('expediente.return')
+                ->middleware('can:tech.assets.assign');
+
+            Route::post('/expediente/{collaborator}/devolucion', [ExpedienteController::class, 'processReturn'])
+                ->name('expediente.return.store')
+                ->middleware('can:tech.assets.assign');
+
             // ── HISTORIAL TI ───────────────────────────────────────────
             Route::get('/history', [AssignmentController::class, 'history'])
                 ->name('history.index')
@@ -356,11 +377,43 @@ Route::middleware(['auth', 'require.consent', 'require.2fa'])->group(function ()
             // ── ASIGNACIONES DE OTROS ACTIVOS — CRUD ──────────────────────────
             Route::middleware('can:assets.assign')->group(function () {
                 Route::get('/assignments',                          [OtroAssetAssignmentController::class, 'index'])        ->name('assignments.index');
+                Route::get('/assignments/buscar',                   [OtroAssetAssignmentController::class, 'searchPage'])   ->name('assignments.search');
                 Route::get('/assignments/create',                   [OtroAssetAssignmentController::class, 'create'])       ->name('assignments.create');
                 Route::post('/assignments',                         [OtroAssetAssignmentController::class, 'store'])        ->name('assignments.store');
                 Route::get('/assignments/{assignment}',             [OtroAssetAssignmentController::class, 'show'])         ->name('assignments.show');
                 Route::get('/assignments/{assignment}/return',      [OtroAssetAssignmentController::class, 'returnAssets']) ->name('assignments.return');
                 Route::post('/assignments/{assignment}/return',     [OtroAssetAssignmentController::class, 'processReturn'])->name('assignments.return.process');
+            });
+
+            // ── EXPEDIENTE DEL DESTINATARIO (OTROS ACTIVOS) ───────────────────
+            Route::middleware('can:assets.assign')->group(function () {
+                // Por Colaborador / Jefe
+                Route::get('/expediente/colaborador/{collaborator}',
+                    [OtroExpedienteController::class, 'showCollaborator'])
+                    ->name('expediente.collaborator');
+                Route::post('/expediente/colaborador/{collaborator}/acta',
+                    [OtroExpedienteController::class, 'generateActaCollaborator'])
+                    ->name('expediente.collaborator.acta');
+                Route::get('/expediente/colaborador/{collaborator}/devolucion',
+                    [OtroExpedienteController::class, 'returnFormCollaborator'])
+                    ->name('expediente.collaborator.return');
+                Route::post('/expediente/colaborador/{collaborator}/devolucion',
+                    [OtroExpedienteController::class, 'processReturnCollaborator'])
+                    ->name('expediente.collaborator.return.store');
+
+                // Por Área / Pool
+                Route::get('/expediente/area/{area}',
+                    [OtroExpedienteController::class, 'showArea'])
+                    ->name('expediente.area');
+                Route::post('/expediente/area/{area}/acta',
+                    [OtroExpedienteController::class, 'generateActaArea'])
+                    ->name('expediente.area.acta');
+                Route::get('/expediente/area/{area}/devolucion',
+                    [OtroExpedienteController::class, 'returnFormArea'])
+                    ->name('expediente.area.return');
+                Route::post('/expediente/area/{area}/devolucion',
+                    [OtroExpedienteController::class, 'processReturnArea'])
+                    ->name('expediente.area.return.store');
             });
 
             // ── PRÉSTAMOS OTROS ACTIVOS ───────────────────────────────────────────
@@ -443,7 +496,8 @@ Route::middleware(['auth', 'require.consent', 'require.2fa'])->group(function ()
         Route::post('/{acta}/send',               [ActaController::class, 'send'])        ->name('send');
         Route::post('/{acta}/sign',               [ActaController::class, 'signInternal'])->name('sign.internal');
         Route::patch('/{acta}/void',              [ActaController::class, 'void'])        ->name('void');
-        Route::post('/generate/{assignment}',     [ActaController::class, 'generate'])    ->name('generate');
+        Route::post('/generate/{assignment}',          [ActaController::class, 'generate'])         ->name('generate');
+        Route::post('/generate-from-loan/{loan}',      [ActaController::class, 'generateFromLoan'])  ->name('generate.from.loan');
     });
     Route::prefix('ai')->name('ai.')->middleware('auth')->group(function () {
         Route::get('/hub',                                 [AxiController::class, 'hub'])                ->name('hub');

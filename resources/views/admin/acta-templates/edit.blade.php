@@ -34,12 +34,13 @@
                         <label class="font-weight-bold">Tipo de acta <span class="text-danger">*</span></label>
                         <select name="acta_type" class="form-control" required>
                             @php($type = old('acta_type', $template->acta_type))
-                            <option value="entrega"   {{ $type==='entrega' ? 'selected' : '' }}>Entrega</option>
-                            <option value="devolucion"{{ $type==='devolucion' ? 'selected' : '' }}>Devolución</option>
-                            <option value="baja"      {{ $type==='baja' ? 'selected' : '' }}>Baja</option>
-                            <option value="donacion"  {{ $type==='donacion' ? 'selected' : '' }}>Donación</option>
-                            <option value="venta"     {{ $type==='venta' ? 'selected' : '' }}>Venta</option>
-                            <option value="actualizacion" {{ $type==='actualizacion' ? 'selected' : '' }}>Actualización</option>
+                            <option value="entrega"      {{ $type==='entrega' ? 'selected' : '' }}>Entrega</option>
+                            <option value="devolucion"   {{ $type==='devolucion' ? 'selected' : '' }}>Devolución</option>
+                            <option value="prestamo"     {{ $type==='prestamo' ? 'selected' : '' }}>Préstamo / Carta</option>
+                            <option value="baja"         {{ $type==='baja' ? 'selected' : '' }}>Baja</option>
+                            <option value="donacion"     {{ $type==='donacion' ? 'selected' : '' }}>Donación</option>
+                            <option value="venta"        {{ $type==='venta' ? 'selected' : '' }}>Venta</option>
+                            <option value="actualizacion"{{ $type==='actualizacion' ? 'selected' : '' }}>Actualización</option>
                         </select>
                     </div>
                 </div>

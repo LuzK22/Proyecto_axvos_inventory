@@ -103,14 +103,20 @@ class OtroLoanController extends Controller
             'notes' => "Prestamo OTRO registrado. Vence: {$loan->end_date->format('d/m/Y')}.",
         ]);
 
-        return redirect()->route('assets.loans.show', $loan)->with('success', 'Prestamo registrado correctamente.');
+        return redirect()->route('assets.loans.show', $loan)
+            ->with('success', 'Prestamo registrado correctamente.')
+            ->with('mostrarActaModal', true);
     }
 
     public function show(Loan $loan)
     {
         abort_unless($this->isOtroLoan($loan), 404);
 
-        $loan->load(['asset.type', 'asset.branch', 'collaborator.branch', 'destinationBranch', 'creator', 'returnedBy']);
+        $relations = ['asset.type', 'asset.branch', 'collaborator.branch', 'destinationBranch', 'creator', 'returnedBy'];
+        if (\Illuminate\Support\Facades\Schema::hasColumn('actas', 'loan_id')) {
+            $relations['actas'] = fn($q) => $q->whereNotIn('status', [\App\Models\Acta::STATUS_ANULADA])->with('signatures')->latest();
+        }
+        $loan->load($relations);
 
         return view('assets.loans.show', compact('loan'));
     }

@@ -77,12 +77,18 @@ class LoanController extends Controller
             'notes' => "Préstamo TI registrado. Vence: {$loan->end_date->format('d/m/Y')}.",
         ]);
 
-        return redirect()->route('tech.loans.show', $loan)->with('success', 'Préstamo registrado correctamente.');
+        return redirect()->route('tech.loans.show', $loan)
+            ->with('success', 'Préstamo registrado correctamente.')
+            ->with('mostrarActaModal', true);
     }
 
     public function show(Loan $loan)
     {
-        $loan->load(['asset.type','asset.branch','collaborator.branch','creator','returnedBy']);
+        $relations = ['asset.type','asset.branch','collaborator.branch','creator','returnedBy'];
+        if (\Illuminate\Support\Facades\Schema::hasColumn('actas', 'loan_id')) {
+            $relations['actas'] = fn($q) => $q->whereNotIn('status', [\App\Models\Acta::STATUS_ANULADA])->with('signatures')->latest();
+        }
+        $loan->load($relations);
         return view('tech.loans.show', compact('loan'));
     }
 

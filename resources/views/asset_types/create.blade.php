@@ -55,27 +55,42 @@
                         <small class="text-muted">El código interno (3 letras) se genera automáticamente.</small>
                     </div>
 
-                    {{-- Subcategoría: solo visible para Otros Activos --}}
-                    @if($category === 'OTRO')
+                    {{-- Subcategoría: aplica a TI y OTRO --}}
                     <div class="form-group">
                         <label class="font-weight-bold">Subcategoría</label>
                         <input type="text" name="subcategory" class="form-control"
-                               placeholder="Ej: Mobiliario, Enseres, Redes, Electrodomésticos..."
+                               placeholder="{{ $category === 'TI' ? 'Ej: Portátiles y Móviles, Periféricos, Pantallas...' : 'Ej: Mobiliario, Enseres, Redes, Electrodomésticos...' }}"
                                value="{{ old('subcategory') }}"
                                list="subcategoryList">
-                        {{-- Sugerencias predefinidas de subcategorías comunes --}}
                         <datalist id="subcategoryList">
-                            <option value="Mobiliario">
-                            <option value="Enseres">
-                            <option value="Electrodomésticos">
-                            <option value="Redes y Conectividad">
-                            <option value="Seguridad">
-                            <option value="Transporte">
-                            <option value="Herramientas">
+                            @if($category === 'TI')
+                                <option value="Portátiles">
+                                <option value="Móviles">
+                                <option value="Periféricos">
+                                <option value="Pantallas">
+                                <option value="Impresión">
+                                <option value="Almacenamiento">
+                                <option value="Red y Conectividad">
+                                <option value="Energía">
+                            @else
+                                <option value="Mobiliario">
+                                <option value="Enseres">
+                                <option value="Electrodomésticos">
+                                <option value="Redes y Conectividad">
+                                <option value="Seguridad">
+                                <option value="Transporte">
+                                <option value="Herramientas">
+                            @endif
                         </datalist>
-                        <small class="text-muted">Agrupa tipos similares. Ej: Silla y Escritorio → subcategoría "Mobiliario".</small>
+                        <small class="text-muted">
+                            Agrupa tipos similares.
+                            @if($category === 'TI')
+                                Ej: Portátil → "Portátiles". Celular, Tablet → "Móviles".
+                            @else
+                                Ej: Silla y Escritorio → subcategoría "Mobiliario".
+                            @endif
+                        </small>
                     </div>
-                    @endif
 
                     <div class="d-flex justify-content-between align-items-center mt-4">
                         @if($category === 'TI')

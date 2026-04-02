@@ -4,17 +4,23 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Models\ActaSignature;
 use App\Models\ActaExcelTemplate;
 use App\Models\ActaFieldValue;
 use App\Models\Assignment;
+use App\Models\Collaborator;
 use App\Models\User;
 
 class Acta extends Model
 {
     protected $fillable = [
         'assignment_id',
+        'loan_id',              // Préstamo de origen (actas tipo prestamo)
+        'collaborator_id',      // FASE 2: destinatario directo (actas consolidadas)
+        'area_id',              // Para actas consolidadas de área/pool
+        'destination_type',     // FASE 2: collaborator | area | pool
         'acta_number',
         'acta_type',
         'asset_category',
@@ -48,6 +54,40 @@ class Acta extends Model
     public function assignment(): BelongsTo
     {
         return $this->belongsTo(Assignment::class);
+    }
+
+    public function loan(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\Loan::class);
+    }
+
+    /** FASE 2: destinatario directo del acta consolidada */
+    public function collaborator(): BelongsTo
+    {
+        return $this->belongsTo(Collaborator::class);
+    }
+
+    /** Área destinataria (actas consolidadas de área/pool) */
+    public function area(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\Area::class);
+    }
+
+    /**
+     * FASE 2: todas las asignaciones incluidas en esta acta (N:M).
+     * Para actas simples hay 1 entrada; para consolidadas hay N.
+     */
+    public function assignments(): BelongsToMany
+    {
+        return $this->belongsToMany(Assignment::class, 'acta_assignments')
+                    ->withTimestamps();
+    }
+
+    /** True si el acta agrupa activos de más de una asignación */
+    public function isConsolidated(): bool
+    {
+        return $this->destination_type !== null
+            || $this->collaborator_id !== null;
     }
 
     public function generatedBy(): BelongsTo
@@ -137,6 +177,7 @@ class Acta extends Model
             self::TYPE_DONACION      => 'DON',
             self::TYPE_VENTA         => 'VEN',
             self::TYPE_ACTUALIZACION => 'ACT',
+            'prestamo'               => 'PRE',
             default                  => 'ACT',
         };
     }
@@ -150,6 +191,7 @@ class Acta extends Model
             self::TYPE_DONACION      => 'Donación',
             self::TYPE_VENTA         => 'Venta',
             self::TYPE_ACTUALIZACION => 'Actualización',
+            'prestamo'               => 'Préstamo',
             default                  => ucfirst($this->acta_type),
         };
     }
@@ -263,6 +305,251 @@ class Acta extends Model
     }
 
     /**
+     * FASE 3 — Genera un acta de ENTREGA consolidada para un colaborador.
+     *
+     * Puede incluir:
+     * - assignment_asset_ids específicos (acta parcial con activos seleccionados)
+     * - Todos los activos activos del colaborador si $aaIds está vacío (acta consolidada)
+     *
+     * Crea la relación en acta_assignments para cada Assignment involucrado.
+     * No duplica si ya existe un acta activa con los mismos assignment_asset_ids.
+     *
+     * @param  Collaborator       $collaborator
+     * @param  string             $category       TI | OTRO | ALL
+     * @param  User               $responsibleUser
+     * @param  array<int>         $aaIds           IDs de AssignmentAsset a incluir (vacío = todos activos)
+     * @return self
+     */
+    public static function generateConsolidatedForCollaborator(
+        Collaborator $collaborator,
+        string $category,
+        User $responsibleUser,
+        array $aaIds = []
+    ): self {
+        $category = strtoupper($category);
+        if (!in_array($category, ['TI', 'OTRO', 'ALL'], true)) {
+            $category = 'TI';
+        }
+
+        // Resolver los AssignmentAssets a incluir
+        $aaQuery = \App\Models\AssignmentAsset::whereNull('returned_at')
+            ->whereHas('assignment', fn($q) =>
+                $q->where('collaborator_id', $collaborator->id)
+            );
+
+        if (in_array($category, ['TI', 'OTRO'], true)) {
+            $aaQuery->whereHas('asset.type', fn($q) => $q->where('category', $category));
+        }
+
+        if (!empty($aaIds)) {
+            $aaQuery->whereIn('id', $aaIds);
+        }
+
+        $assignmentAssets = $aaQuery->with('assignment')->get();
+        $resolvedAaIds    = $assignmentAssets->pluck('id')->values()->all();
+
+        // IDs únicos de asignaciones involucradas
+        $assignmentIds = $assignmentAssets
+            ->pluck('assignment_id')
+            ->unique()
+            ->values()
+            ->all();
+
+        return \Illuminate\Support\Facades\DB::transaction(function () use (
+            $collaborator, $category, $responsibleUser, $resolvedAaIds, $assignmentIds
+        ) {
+            $acta = self::create([
+                'assignment_id'   => count($assignmentIds) === 1 ? $assignmentIds[0] : null,
+                'collaborator_id' => $collaborator->id,
+                'destination_type'=> 'collaborator',
+                'acta_number'     => self::generateActaNumber($category, self::TYPE_ENTREGA),
+                'acta_type'       => self::TYPE_ENTREGA,
+                'asset_category'  => $category,
+                'asset_scope'     => ['assignment_asset_ids' => $resolvedAaIds],
+                'status'          => self::STATUS_BORRADOR,
+                'generated_by'    => $responsibleUser->id,
+            ]);
+
+            // Registrar en pivot acta_assignments
+            if (!empty($assignmentIds)) {
+                $acta->assignments()->sync($assignmentIds);
+            }
+
+            // Firmas
+            ActaSignature::createCollaboratorSignature(
+                $acta,
+                $collaborator->full_name,
+                $collaborator->email,
+                7
+            );
+            ActaSignature::createResponsibleSignature($acta, $responsibleUser, 7);
+
+            return $acta;
+        });
+    }
+
+    /**
+     * FASE 3 — Genera acta de DEVOLUCIÓN consolidada desde el expediente.
+     *
+     * @param  Collaborator  $collaborator
+     * @param  string        $category
+     * @param  User          $responsibleUser
+     * @param  array<int>    $aaIds  IDs de AssignmentAsset YA devueltos en esta operación
+     * @return self
+     */
+    public static function generateReturnForCollaborator(
+        Collaborator $collaborator,
+        string $category,
+        User $responsibleUser,
+        array $aaIds
+    ): self {
+        $category      = strtoupper($category);
+        $assignmentIds = \App\Models\AssignmentAsset::whereIn('id', $aaIds)
+            ->pluck('assignment_id')
+            ->unique()
+            ->values()
+            ->all();
+
+        return \Illuminate\Support\Facades\DB::transaction(function () use (
+            $collaborator, $category, $responsibleUser, $aaIds, $assignmentIds
+        ) {
+            $acta = self::create([
+                'assignment_id'   => count($assignmentIds) === 1 ? $assignmentIds[0] : null,
+                'collaborator_id' => $collaborator->id,
+                'destination_type'=> 'collaborator',
+                'acta_number'     => self::generateActaNumber($category, self::TYPE_DEVOLUCION),
+                'acta_type'       => self::TYPE_DEVOLUCION,
+                'asset_category'  => $category,
+                'asset_scope'     => ['assignment_asset_ids' => array_values($aaIds)],
+                'status'          => self::STATUS_BORRADOR,
+                'generated_by'    => $responsibleUser->id,
+            ]);
+
+            if (!empty($assignmentIds)) {
+                $acta->assignments()->sync($assignmentIds);
+            }
+
+            ActaSignature::createCollaboratorSignature(
+                $acta,
+                $collaborator->full_name,
+                $collaborator->email,
+                7
+            );
+            ActaSignature::createResponsibleSignature($acta, $responsibleUser, 7);
+
+            return $acta;
+        });
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // ACTAS DE ÁREA (OTROS ACTIVOS)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Genera acta de ENTREGA consolidada para un Área (OTROS ACTIVOS).
+     *
+     * @param  \App\Models\Area  $area
+     * @param  string            $category  'OTRO'
+     * @param  User              $responsibleUser
+     * @param  array<int>        $aaIds  IDs de AssignmentAsset a incluir (vacío = todos activos)
+     */
+    public static function generateConsolidatedForArea(
+        \App\Models\Area $area,
+        string $category,
+        User $responsibleUser,
+        array $aaIds = []
+    ): self {
+        $category = strtoupper($category);
+        if (!in_array($category, ['TI', 'OTRO', 'ALL'], true)) {
+            $category = 'OTRO';
+        }
+
+        $aaQuery = \App\Models\AssignmentAsset::whereNull('returned_at')
+            ->whereHas('assignment', fn($q) =>
+                $q->where('area_id', $area->id)
+                  ->whereIn('destination_type', ['area', 'pool'])
+            );
+
+        if (in_array($category, ['TI', 'OTRO'], true)) {
+            $aaQuery->whereHas('asset.type', fn($q) => $q->where('category', $category));
+        }
+
+        if (!empty($aaIds)) {
+            $aaQuery->whereIn('id', $aaIds);
+        }
+
+        $assignmentAssets = $aaQuery->with('assignment')->get();
+        $resolvedAaIds    = $assignmentAssets->pluck('id')->values()->all();
+        $assignmentIds    = $assignmentAssets->pluck('assignment_id')->unique()->values()->all();
+
+        return \Illuminate\Support\Facades\DB::transaction(function () use (
+            $area, $category, $responsibleUser, $resolvedAaIds, $assignmentIds
+        ) {
+            $acta = self::create([
+                'assignment_id'   => count($assignmentIds) === 1 ? $assignmentIds[0] : null,
+                'area_id'         => $area->id,
+                'destination_type'=> 'area',
+                'acta_number'     => self::generateActaNumber($category, self::TYPE_ENTREGA),
+                'acta_type'       => self::TYPE_ENTREGA,
+                'asset_category'  => $category,
+                'asset_scope'     => ['assignment_asset_ids' => $resolvedAaIds],
+                'status'          => self::STATUS_BORRADOR,
+                'generated_by'    => $responsibleUser->id,
+            ]);
+
+            if (!empty($assignmentIds)) {
+                $acta->assignments()->sync($assignmentIds);
+            }
+
+            // Para área: firma del responsable únicamente (sin colaborador individual)
+            ActaSignature::createResponsibleSignature($acta, $responsibleUser, 7);
+
+            return $acta;
+        });
+    }
+
+    /**
+     * Genera acta de DEVOLUCIÓN consolidada para un Área (OTROS ACTIVOS).
+     */
+    public static function generateReturnForArea(
+        \App\Models\Area $area,
+        string $category,
+        User $responsibleUser,
+        array $aaIds
+    ): self {
+        $category      = strtoupper($category);
+        $assignmentIds = \App\Models\AssignmentAsset::whereIn('id', $aaIds)
+            ->pluck('assignment_id')
+            ->unique()
+            ->values()
+            ->all();
+
+        return \Illuminate\Support\Facades\DB::transaction(function () use (
+            $area, $category, $responsibleUser, $aaIds, $assignmentIds
+        ) {
+            $acta = self::create([
+                'assignment_id'   => count($assignmentIds) === 1 ? $assignmentIds[0] : null,
+                'area_id'         => $area->id,
+                'destination_type'=> 'area',
+                'acta_number'     => self::generateActaNumber($category, self::TYPE_DEVOLUCION),
+                'acta_type'       => self::TYPE_DEVOLUCION,
+                'asset_category'  => $category,
+                'asset_scope'     => ['assignment_asset_ids' => array_values($aaIds)],
+                'status'          => self::STATUS_BORRADOR,
+                'generated_by'    => $responsibleUser->id,
+            ]);
+
+            if (!empty($assignmentIds)) {
+                $acta->assignments()->sync($assignmentIds);
+            }
+
+            ActaSignature::createResponsibleSignature($acta, $responsibleUser, 7);
+
+            return $acta;
+        });
+    }
+
+    /**
      * Obtiene la plantilla Excel activa para esta acta (por tipo + categoría).
      * Fallback: plantilla con asset_category = 'ALL' para el mismo acta_type.
      */
@@ -306,6 +593,43 @@ class Acta extends Model
             ->filter()
             ->values();
 
+        // ── Actas de PRÉSTAMO: el activo viene del Loan directamente ──────
+        if ($this->loan_id && $this->assignment_id === null) {
+            $this->loadMissing(['loan.asset.type', 'loan.asset.branch']);
+            $asset = $this->loan?->asset;
+            if ($asset) {
+                return collect([(object)[
+                    'asset'       => $asset,
+                    'returned_at' => $this->loan->returned_at ?? null,
+                    'created_at'  => $this->loan->start_date ?? $this->created_at,
+                ]]);
+            }
+            return collect();
+        }
+
+        // FASE 2: actas consolidadas no tienen una sola assignment raíz —
+        // resolvemos por asset_scope (siempre presente en actas del expediente)
+        if ($this->isConsolidated() && $scopeIds->isNotEmpty()) {
+            $query = \App\Models\AssignmentAsset::whereIn('id', $scopeIds->all())
+                ->with('asset.type');
+
+            if ($this->acta_type === self::TYPE_DEVOLUCION) {
+                $query->whereNotNull('returned_at');
+            }
+
+            if (in_array($category, ['TI', 'OTRO'], true)) {
+                $query->whereHas('asset.type', fn($q) => $q->where('category', $category));
+            }
+
+            return $query->get();
+        }
+
+        // Guard: si la acta es consolidada pero sin scope resuelto, colección vacía
+        if ($this->isConsolidated() || $this->assignment === null) {
+            return collect();
+        }
+
+        // Actas simples (una sola asignación): comportamiento original
         $query = $this->assignment->assignmentAssets()
             ->with('asset.type');
 
@@ -330,6 +654,49 @@ class Acta extends Model
     {
         return $this->scopedAssignmentAssets()
             ->contains(fn ($aa) => strtoupper($aa->asset?->type?->category ?? '') === 'TI');
+    }
+
+    /**
+     * Genera (o reutiliza) un Acta de PRÉSTAMO para un Loan.
+     * No duplica si ya existe una acta activa (no anulada) para el mismo préstamo.
+     */
+    public static function generateForLoan(\App\Models\Loan $loan, \App\Models\User $responsibleUser): self
+    {
+        // No duplicar
+        $existing = self::where('loan_id', $loan->id)
+            ->whereNotIn('status', [self::STATUS_ANULADA])
+            ->latest()
+            ->first();
+
+        if ($existing) {
+            return $existing;
+        }
+
+        $category = strtoupper($loan->asset?->type?->category ?? 'TI');
+        if (! in_array($category, ['TI', 'OTRO'], true)) {
+            $category = 'TI';
+        }
+
+        $acta = self::create([
+            'loan_id'        => $loan->id,
+            'acta_number'    => self::generateActaNumber($category, 'prestamo'),
+            'acta_type'      => 'prestamo',
+            'asset_category' => $category,
+            'status'         => self::STATUS_BORRADOR,
+            'generated_by'   => $responsibleUser->id,
+        ]);
+
+        // Firma del receptor (colaborador o destino por nombre)
+        $recipientName  = $loan->collaborator?->full_name
+            ?? ($loan->destinationBranch?->name ?? 'Destinatario');
+        $recipientEmail = $loan->collaborator?->email ?? null;
+
+        ActaSignature::createCollaboratorSignature($acta, $recipientName, $recipientEmail, 7);
+
+        // Firma del responsable
+        ActaSignature::createResponsibleSignature($acta, $responsibleUser, 7);
+
+        return $acta;
     }
 
     /**

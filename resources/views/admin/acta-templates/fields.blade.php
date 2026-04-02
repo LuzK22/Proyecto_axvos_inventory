@@ -23,46 +23,56 @@
 
 @include('partials._alerts')
 
-@if(in_array($template->asset_category, ['TI', 'ALL'], true))
-    <div class="alert alert-info shadow-sm">
-        <strong>
-            Campos sugeridos para plantillas {{ $template->asset_category === 'ALL' ? 'MIXTAS' : 'TI' }}:
-        </strong>
-        <code>asset_tag</code> para “Etiqueta Inventario” y 
-        <code>fixed_asset_code</code> para “Activo Fijo”.
+@php
+    $autoCount   = $template->fields->filter(fn($f) => $f->is_auto)->count();
+    $manualCount = $template->fields->filter(fn($f) => !$f->is_auto && !$f->is_iterable)->count();
+    $iterCount   = $template->fields->where('is_iterable', true)->count();
+@endphp
+
+<div class="row mb-3">
+    <div class="col-md-4">
+        <div class="card shadow-sm text-center py-2" style="border-top:3px solid #16a34a;">
+            <div style="font-size:1.4rem;font-weight:700;color:#16a34a;">{{ $autoCount }}</div>
+            <small class="text-muted">Campos automaticos</small>
+        </div>
     </div>
-@endif
-        <code>asset_tag</code> para “Etiqueta Inventario” y <code>fixed_asset_code</code> para “Activo Fijo”.
+    <div class="col-md-4">
+        <div class="card shadow-sm text-center py-2" style="border-top:3px solid #f59e0b;">
+            <div style="font-size:1.4rem;font-weight:700;color:#f59e0b;">{{ $manualCount }}</div>
+            <small class="text-muted">Campos manuales</small>
+        </div>
     </div>
-@endif
+    <div class="col-md-4">
+        <div class="card shadow-sm text-center py-2" style="border-top:3px solid #3b82f6;">
+            <div style="font-size:1.4rem;font-weight:700;color:#3b82f6;">{{ $iterCount }}</div>
+            <small class="text-muted">Campos de tabla</small>
+        </div>
+    </div>
+</div>
 
 <div class="row">
     <div class="col-lg-4">
         <div class="card shadow-sm">
-            <div class="card-header">
-                <strong>Agregar campo</strong>
-            </div>
+            <div class="card-header"><strong>Agregar campo</strong></div>
             <div class="card-body">
                 <form method="POST" action="{{ route('admin.acta-templates.fields.store', $template) }}">
                     @csrf
                     <div class="form-group">
                         <label class="font-weight-bold">Key <span class="text-danger">*</span></label>
-                        <input name="field_key" class="form-control" value="{{ old('field_key') }}" placeholder="Ej: collaborator_name" required>
-                        <small class="text-muted">Identificador estable (sin espacios).</small>
+                        <input name="field_key" class="form-control" value="{{ old('field_key') }}" required>
                     </div>
                     <div class="form-group">
                         <label class="font-weight-bold">Etiqueta <span class="text-danger">*</span></label>
-                        <input name="field_label" class="form-control" value="{{ old('field_label') }}" placeholder="Ej: Nombre del colaborador" required>
+                        <input name="field_label" class="form-control" value="{{ old('field_label') }}" required>
                     </div>
                     <div class="form-group">
                         <label class="font-weight-bold">Celda <span class="text-danger">*</span></label>
-                        <input name="cell_ref" class="form-control" value="{{ old('cell_ref') }}" placeholder="Ej: B5 o A{row}" required>
-                        <small class="text-muted">Para lista de activos usa {row}. Fila base: {{ $template->assets_start_row ?? 'no definida' }}.</small>
+                        <input name="cell_ref" class="form-control" value="{{ old('cell_ref') }}" required>
                     </div>
                     <div class="form-group">
                         <div class="custom-control custom-checkbox">
                             <input type="checkbox" class="custom-control-input" id="is_iterable" name="is_iterable" value="1">
-                            <label class="custom-control-label" for="is_iterable">Es iterable (por activo)</label>
+                            <label class="custom-control-label" for="is_iterable">Es iterable</label>
                         </div>
                     </div>
                     <div class="form-group">
@@ -83,22 +93,34 @@
                 <table class="table table-sm table-hover mb-0">
                     <thead class="thead-light">
                         <tr>
-                            <th>Key</th>
+                            <th>Marcador</th>
                             <th>Etiqueta</th>
                             <th>Celda</th>
-                            <th>Iterable</th>
-                            <th>Orden</th>
+                            <th>Tipo</th>
+                            <th>Rellena</th>
                             <th class="text-right">Acciones</th>
                         </tr>
                     </thead>
                     <tbody>
                     @forelse($template->fields as $f)
                         <tr>
-                            <td><code>{{ $f->field_key }}</code></td>
-                            <td>{{ $f->field_label }}</td>
-                            <td><code>{{ $f->cell_ref }}</code></td>
-                            <td>{!! $f->is_iterable ? '<span class="badge badge-info">Sí</span>' : '<span class="badge badge-light">No</span>' !!}</td>
-                            <td>{{ $f->sort_order }}</td>
+                            <td><code style="font-size:.78rem;">@{{{{ $f->field_key }}}}</code></td>
+                            <td style="font-size:.82rem;">{{ $f->field_label }}</td>
+                            <td><code style="font-size:.75rem;">{{ $f->cell_ref }}</code></td>
+                            <td>
+                                @if($f->is_iterable)
+                                    <span class="badge badge-primary" style="font-size:.65rem;">Tabla activos</span>
+                                @else
+                                    <span class="badge badge-secondary" style="font-size:.65rem;">Cabecera</span>
+                                @endif
+                            </td>
+                            <td>
+                                @if($f->is_auto)
+                                    <span class="badge badge-success" style="font-size:.65rem;">Automatico</span>
+                                @else
+                                    <span class="badge badge-warning" style="font-size:.65rem;">Manual</span>
+                                @endif
+                            </td>
                             <td class="text-right">
                                 <button class="btn btn-xs btn-outline-secondary" type="button"
                                         onclick="fillEdit({{ $f->id }}, '{{ addslashes($f->field_key) }}', '{{ addslashes($f->field_label) }}', '{{ addslashes($f->cell_ref) }}', {{ $f->is_iterable ? 'true' : 'false' }}, {{ $f->sort_order }})">
@@ -107,14 +129,14 @@
                                 <form method="POST" action="{{ route('admin.acta-templates.fields.destroy', [$template, $f]) }}" class="d-inline">
                                     @csrf
                                     @method('DELETE')
-                                    <button class="btn btn-xs btn-outline-danger" onclick="return confirm('¿Eliminar campo?')">
+                                    <button class="btn btn-xs btn-outline-danger" onclick="return confirm('Eliminar campo?')">
                                         <i class="fas fa-trash"></i>
                                     </button>
                                 </form>
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="6" class="text-center text-muted p-4">Aún no has configurado campos.</td></tr>
+                        <tr><td colspan="6" class="text-center text-muted p-4">Aun no hay campos configurados.</td></tr>
                     @endforelse
                     </tbody>
                 </table>
@@ -122,9 +144,7 @@
         </div>
 
         <div class="card shadow-sm">
-            <div class="card-header">
-                <strong>Editar campo</strong>
-            </div>
+            <div class="card-header"><strong>Editar campo</strong></div>
             <div class="card-body">
                 <form id="editForm" method="POST" action="">
                     @csrf
@@ -171,7 +191,6 @@
                         </div>
                     </div>
                 </form>
-                <small class="text-muted">Selecciona un campo y pulsa el lápiz para cargarlo aquí.</small>
             </div>
         </div>
     </div>
@@ -193,3 +212,4 @@ function fillEdit(id, key, label, cell, iterable, order) {
 }
 </script>
 @stop
+

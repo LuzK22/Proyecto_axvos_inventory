@@ -16,37 +16,6 @@
 @section('content')
 @include('partials._alerts')
 
-<div class="row mb-3">
-    <div class="col-md-4">
-        <div class="info-box">
-            <span class="info-box-icon bg-primary"><i class="fas fa-users"></i></span>
-            <div class="info-box-content">
-                <span class="info-box-text">Colaboradores con asignacion</span>
-                <span class="info-box-number">{{ $groupedAssignments->count() }}</span>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-4">
-        <div class="info-box">
-            <span class="info-box-icon bg-success"><i class="fas fa-laptop"></i></span>
-            <div class="info-box-content">
-                <span class="info-box-text">Activos TI en uso</span>
-                <span class="info-box-number">{{ $assignments->sum(fn($a) => $a->activeAssets->count()) }}</span>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-4">
-        <div class="info-box">
-            <span class="info-box-icon bg-info"><i class="fas fa-history"></i></span>
-            <div class="info-box-content">
-                <span class="info-box-text">Ver historial TI</span>
-                <span class="info-box-number">
-                    <a href="{{ route('tech.history.index') }}" class="text-white text-decoration-none">Completo</a>
-                </span>
-            </div>
-        </div>
-    </div>
-</div>
 
 <div class="card card-outline card-primary">
     <div class="card-header py-2">
@@ -100,15 +69,16 @@
                                 <small>{{ optional($latest->assignment_date)->format('d/m/Y') ?? '-' }}</small><br>
                                 <small class="text-muted">#{{ $latest->id }}</small>
                             </td>
-                            <td>
-                                <a href="{{ route('collaborators.show', $collaborator) }}" class="btn btn-sm btn-outline-primary" title="Expediente">
-                                    <i class="fas fa-user"></i>
-                                </a>
-                                <a href="{{ route('tech.assignments.show', $latest) }}" class="btn btn-sm btn-info" title="Ver ultima">
-                                    <i class="fas fa-eye"></i>
+                            <td style="white-space:nowrap;">
+                                <a href="{{ route('tech.expediente.show', $collaborator) }}"
+                                   class="btn btn-sm btn-primary"
+                                   title="Ver activos TI del colaborador">
+                                    <i class="fas fa-eye mr-1"></i> Ver
                                 </a>
                                 @can('tech.assets.assign')
-                                    <a href="{{ route('tech.assignments.create', ['collaborator_id' => $collaborator->id]) }}" class="btn btn-sm btn-primary" title="Asignar">
+                                    <a href="{{ route('tech.assignments.create', ['collaborator_id' => $collaborator->id]) }}"
+                                       class="btn btn-sm btn-outline-success"
+                                       title="Nueva asignación TI">
                                         <i class="fas fa-plus"></i>
                                     </a>
                                 @endcan

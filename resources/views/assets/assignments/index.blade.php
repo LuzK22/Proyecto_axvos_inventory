@@ -108,10 +108,26 @@
                                     <small>{{ optional($row['latest_assignment']->assignment_date)->format('d/m/Y') ?? '-' }}</small><br>
                                     <small class="text-muted">#{{ $row['latest_assignment']->id }}</small>
                                 </td>
-                                <td class="text-center">
-                                    <a href="{{ route('assets.assignments.show', $row['latest_assignment']) }}" class="btn btn-xs btn-info">
-                                        <i class="fas fa-eye"></i>
+                                <td class="text-center" style="white-space:nowrap;">
+                                    @if(in_array($groupBy, ['collaborator', 'jefe']))
+                                        <a href="{{ route('assets.expediente.collaborator', $row['key']) }}"
+                                           class="btn btn-xs btn-primary" title="Ver activos del destinatario">
+                                            <i class="fas fa-eye mr-1"></i>Ver
+                                        </a>
+                                    @else
+                                        <a href="{{ route('assets.expediente.area', $row['key']) }}"
+                                           class="btn btn-xs btn-primary" title="Ver activos del área">
+                                            <i class="fas fa-eye mr-1"></i>Ver
+                                        </a>
+                                    @endif
+                                    @can('assets.assign')
+                                    @if(in_array($groupBy, ['collaborator', 'jefe']))
+                                    <a href="{{ route('assets.assignments.create', ['collaborator_id' => $row['key'], 'destination' => $groupBy]) }}"
+                                       class="btn btn-xs btn-outline-success ml-1" title="Nueva asignación">
+                                        <i class="fas fa-plus"></i>
                                     </a>
+                                    @endif
+                                    @endcan
                                 </td>
                             </tr>
                         @endforeach
@@ -166,10 +182,23 @@
                                 <td class="align-middle">
                                     <span class="badge {{ $a->status === 'activa' ? 'badge-success' : 'badge-secondary' }}">{{ ucfirst($a->status) }}</span>
                                 </td>
-                                <td class="align-middle text-center">
-                                    <a href="{{ route('assets.assignments.show', $a) }}" class="btn btn-xs btn-info">
-                                        <i class="fas fa-eye"></i>
-                                    </a>
+                                <td class="align-middle text-center" style="white-space:nowrap;">
+                                    @if(in_array($a->destination_type, ['collaborator', 'jefe']) && $a->collaborator_id)
+                                        <a href="{{ route('assets.expediente.collaborator', $a->collaborator_id) }}"
+                                           class="btn btn-xs btn-primary" title="Ver activos del destinatario">
+                                            <i class="fas fa-eye mr-1"></i>Ver
+                                        </a>
+                                    @elseif(in_array($a->destination_type, ['area', 'pool']) && $a->area_id)
+                                        <a href="{{ route('assets.expediente.area', $a->area_id) }}"
+                                           class="btn btn-xs btn-primary" title="Ver activos del área">
+                                            <i class="fas fa-eye mr-1"></i>Ver
+                                        </a>
+                                    @else
+                                        <a href="{{ route('assets.assignments.show', $a) }}"
+                                           class="btn btn-xs btn-outline-secondary" title="Ver asignación">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                    @endif
                                 </td>
                             </tr>
                         @endforeach

@@ -23,6 +23,8 @@ class AssetController extends Controller
             'model'            => 'required|string|max:100',
             // El serial debe ser único; al editar excluimos el propio registro
             'serial'           => 'required|string|max:100|unique:assets,serial' . ($assetId ? ",{$assetId}" : ''),
+            'hostname'         => 'nullable|string|max:100',
+            'domain_user'      => 'nullable|string|max:100',
             'asset_tag'        => 'nullable|string|max:100|unique:assets,asset_tag' . ($assetId ? ",{$assetId}" : ''),
             'fixed_asset_code' => 'nullable|string|max:100|unique:assets,fixed_asset_code' . ($assetId ? ",{$assetId}" : ''),
             'property_type'    => 'required|in:PROPIO,LEASING,ALQUILADO,OTRO',
@@ -46,6 +48,8 @@ class AssetController extends Controller
             $query->where(function ($sub) use ($q) {
                 $sub->where('internal_code', 'like', "%{$q}%")
                     ->orWhere('serial', 'like', "%{$q}%")
+                    ->orWhere('hostname', 'like', "%{$q}%")
+                    ->orWhere('domain_user', 'like', "%{$q}%")
                     ->orWhere('brand', 'like', "%{$q}%")
                     ->orWhere('model', 'like', "%{$q}%")
                     ->orWhere('asset_tag', 'like', "%{$q}%")
@@ -149,6 +153,8 @@ class AssetController extends Controller
             'brand'            => $request->brand,
             'model'            => $request->model,
             'serial'           => $request->serial,
+            'hostname'         => $request->hostname,
+            'domain_user'      => $request->domain_user,
             'asset_tag'        => $request->asset_tag,
             'fixed_asset_code' => $request->fixed_asset_code,
             'property_type'    => $request->property_type,
@@ -194,6 +200,8 @@ class AssetController extends Controller
             'brand'            => $request->brand,
             'model'            => $request->model,
             'serial'           => $request->serial,
+            'hostname'         => $request->hostname,
+            'domain_user'      => $request->domain_user,
             'asset_tag'        => $request->asset_tag,
             'fixed_asset_code' => $request->fixed_asset_code,
             'property_type'    => $request->property_type,
@@ -235,7 +243,9 @@ class AssetController extends Controller
                         ->where('internal_code', 'like', "%{$term}%")
                         ->orWhere('brand', 'like', "%{$term}%")
                         ->orWhere('model', 'like', "%{$term}%")
-                        ->orWhere('serial', 'like', "%{$term}%"));
+                        ->orWhere('serial', 'like', "%{$term}%")
+                        ->orWhere('hostname', 'like', "%{$term}%")
+                        ->orWhere('domain_user', 'like', "%{$term}%"));
             });
         }
 
@@ -258,6 +268,8 @@ class AssetController extends Controller
                         ->orWhere('brand', 'like', "%{$term}%")
                         ->orWhere('model', 'like', "%{$term}%")
                         ->orWhere('serial', 'like', "%{$term}%")
+                        ->orWhere('hostname', 'like', "%{$term}%")
+                        ->orWhere('domain_user', 'like', "%{$term}%")
                         ->orWhere('asset_tag', 'like', "%{$term}%")
                         ->orWhere('fixed_asset_code', 'like', "%{$term}%");
                 });
@@ -309,6 +321,8 @@ class AssetController extends Controller
             $query->where(function ($sub) use ($q) {
                 $sub->where('internal_code', 'like', "%{$q}%")
                     ->orWhere('serial',       'like', "%{$q}%")
+                    ->orWhere('hostname',     'like', "%{$q}%")
+                    ->orWhere('domain_user',  'like', "%{$q}%")
                     ->orWhere('brand',        'like', "%{$q}%")
                     ->orWhere('model',        'like', "%{$q}%")
                     ->orWhere('asset_tag',    'like', "%{$q}%");
@@ -389,6 +403,8 @@ class AssetController extends Controller
             'brand'            => $request->brand,
             'model'            => $request->model,
             'serial'           => $request->serial,
+            'hostname'         => $request->hostname,
+            'domain_user'      => $request->domain_user,
             'asset_tag'        => $request->asset_tag,
             'fixed_asset_code' => $request->fixed_asset_code,
             'property_type'    => $request->property_type,
@@ -475,6 +491,8 @@ class AssetController extends Controller
             'brand'            => $request->brand,
             'model'            => $request->model,
             'serial'           => $request->serial,
+            'hostname'         => $request->hostname,
+            'domain_user'      => $request->domain_user,
             'asset_tag'        => $request->asset_tag,
             'fixed_asset_code' => $request->fixed_asset_code,
             'property_type'    => $request->property_type,
@@ -514,7 +532,9 @@ class AssetController extends Controller
                     ->orWhereHas('asset', fn($asset) => $asset
                         ->where('internal_code', 'like', "%{$term}%")
                         ->orWhere('brand', 'like', "%{$term}%")
-                        ->orWhere('model', 'like', "%{$term}%"));
+                        ->orWhere('model', 'like', "%{$term}%")
+                        ->orWhere('hostname', 'like', "%{$term}%")
+                        ->orWhere('domain_user', 'like', "%{$term}%"));
             });
         }
 
@@ -536,7 +556,9 @@ class AssetController extends Controller
                     $sub->where('internal_code', 'like', "%{$term}%")
                         ->orWhere('brand', 'like', "%{$term}%")
                         ->orWhere('model', 'like', "%{$term}%")
-                        ->orWhere('serial', 'like', "%{$term}%");
+                        ->orWhere('serial', 'like', "%{$term}%")
+                        ->orWhere('hostname', 'like', "%{$term}%")
+                        ->orWhere('domain_user', 'like', "%{$term}%");
                 });
             })
             ->when($request->filled('subcategory'), function ($q) use ($request) {
